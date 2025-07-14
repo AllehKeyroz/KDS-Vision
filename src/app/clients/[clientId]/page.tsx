@@ -22,7 +22,6 @@ export default function ClientContextPage() {
         toast({
             title: "Contexto Salvo!",
             description: "As informações do cliente foram atualizadas com sucesso.",
-            className: "bg-green-100 border-green-300 text-green-800"
         });
     }
 

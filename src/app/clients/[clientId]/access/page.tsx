@@ -1,14 +1,16 @@
 'use client'
 
-import React from 'react';
+import React, { useState } from 'react';
 import { useParams } from 'next/navigation';
 import { CLIENT_ACCESS_DATA } from '@/lib/data';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Copy, Edit, PlusCircle, Trash2 } from 'lucide-react';
+import { Copy, Edit, PlusCircle, Trash2, Save } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
 
 export default function AccessPage() {
     const params = useParams();
@@ -27,20 +29,37 @@ export default function AccessPage() {
     }
 
     return (
-        <Card>
-            <CardHeader className="flex-row items-center justify-between">
+        <div className="space-y-6">
+            <h2 className="text-2xl font-bold tracking-tight">Acessos</h2>
+            <form className="max-w-md space-y-4">
                 <div>
-                    <CardTitle className="font-headline">Gerenciamento de Acessos</CardTitle>
-                    <CardDescription>
-                        Guarde e gerencie os acessos do cliente de forma segura.
-                    </CardDescription>
+                    <Label htmlFor="platform" className="pb-2">Plataforma</Label>
+                    <Input id="platform" placeholder="Ex: Plataforma de Anúncios" />
                 </div>
-                <Button>
-                    <PlusCircle className="mr-2 h-4 w-4" />
-                    Adicionar Acesso
-                </Button>
-            </CardHeader>
-            <CardContent>
+                 <div>
+                    <Label htmlFor="link" className="pb-2">Link</Label>
+                    <Input id="link" placeholder="Ex: Link para a plataforma" />
+                </div>
+                 <div>
+                    <Label htmlFor="login" className="pb-2">Login</Label>
+                    <Input id="login" placeholder="Ex: Login de acesso" />
+                </div>
+                 <div>
+                    <Label htmlFor="password">Senha</Label>
+                    <Input id="password" type="password" placeholder="Ex: Senha de acesso" />
+                </div>
+                 <div>
+                    <Label htmlFor="apiKey" className="pb-2">Chave de API</Label>
+                    <Input id="apiKey" placeholder="Ex: Chave de API para integração" />
+                </div>
+                <div className="flex justify-end">
+                    <Button type="submit" variant="secondary" className="font-bold tracking-wide">
+                        Salvar Acesso
+                    </Button>
+                </div>
+            </form>
+            <Card>
+            <CardContent className="p-0">
                 <Table>
                     <TableHeader>
                         <TableRow>
@@ -89,5 +108,6 @@ export default function AccessPage() {
                 </Table>
             </CardContent>
         </Card>
+        </div>
     );
 }

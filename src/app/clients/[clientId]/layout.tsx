@@ -6,13 +6,14 @@ import { usePathname, useParams } from 'next/navigation';
 import Image from 'next/image';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Bot, FileText, KeyRound, Lightbulb, Megaphone, Share2 } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 const tabs = [
-  { name: 'Contexto', href: '', icon: FileText },
-  { name: 'Acessos', href: '/access', icon: KeyRound },
-  { name: 'Brainstorming IA', href: '/brainstorming', icon: Lightbulb },
+  { name: 'Acessos', href: '', icon: KeyRound },
+  { name: 'Brainstorm IA', href: '/brainstorming', icon: Lightbulb },
+  { name: 'Contexto', href: '/context', icon: FileText },
   { name: 'Agentes IA', href: '/agents', icon: Bot },
-  { name: 'Social Strategist', href: '/social', icon: Share2 },
+  { name: 'Social', href: '/social', icon: Share2 },
   { name: 'Ads Creator', href: '/ads', icon: Megaphone },
 ];
 
@@ -28,33 +29,36 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
   }
 
   const basePath = `/clients/${clientId}`;
-  const currentPathSegment = pathname.substring(basePath.length);
-  const currentTab = tabs.find(tab => tab.href === currentPathSegment) || tabs[0];
+  // Handle /clients/[clientId] as the first tab
+  const currentPathSegment = pathname === basePath ? '' : pathname.substring(basePath.length);
   
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:gap-4">
-        <Image src={client.logo} alt={`Logo ${client.name}`} width={64} height={64} className="rounded-xl border shadow-sm" data-ai-hint="logo business" />
         <div className="mt-2 sm:mt-0">
-          <h1 className="text-3xl font-bold font-headline">{client.name}</h1>
-          <p className="text-muted-foreground">Painel de gerenciamento do cliente.</p>
+          <h1 className="text-3xl font-bold tracking-tight">Detalhes do Cliente - {client.name}</h1>
+        </div>
+      </div>
+      
+      <div className="border-b">
+        <div className="flex gap-8 px-4">
+          {tabs.map((tab) => {
+            const isActive = tab.href === currentPathSegment || (tab.href === '/context' && currentPathSegment === '');
+            return (
+              <Link href={`${basePath}${tab.href === '/context' ? '' : tab.href}`} key={tab.name} passHref>
+                <div className={cn(
+                  "flex flex-col items-center justify-center pb-3 pt-4 text-sm font-bold tracking-wide",
+                  isActive ? "border-b-[3px] border-foreground text-foreground" : "border-b-[3px] border-transparent text-muted-foreground"
+                )}>
+                  {tab.name}
+                </div>
+              </Link>
+            )
+          })}
         </div>
       </div>
 
-      <Tabs value={currentTab.href} className="w-full">
-        <TabsList className="grid w-full grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 h-auto p-1">
-          {tabs.map((tab) => (
-            <Link href={`${basePath}${tab.href}`} key={tab.name} passHref>
-              <TabsTrigger value={tab.href} className="w-full flex-col sm:flex-row sm:justify-center gap-2 h-12">
-                <tab.icon className="w-4 h-4" />
-                <span>{tab.name}</span>
-              </TabsTrigger>
-            </Link>
-          ))}
-        </TabsList>
-      </Tabs>
-
-      <div className="mt-6">
+      <div className="mt-6 px-4">
         {children}
       </div>
     </div>

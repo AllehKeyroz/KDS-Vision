@@ -8,8 +8,8 @@ export default function DashboardPage() {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-3xl font-bold font-headline">Dashboard</h1>
-        <p className="text-muted-foreground">Visão geral do seu negócio na Keyroz Vision.</p>
+        <h1 className="text-3xl font-bold">Dashboard</h1>
+        <p className="text-muted-foreground">Visão geral do seu negócio na Agência Digital.</p>
       </div>
       
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
@@ -66,13 +66,13 @@ export default function DashboardPage() {
       </div>
 
       <div className="space-y-4">
-        <h2 className="text-2xl font-bold font-headline">Acesso Rápido</h2>
+        <h2 className="text-2xl font-bold">Acesso Rápido</h2>
         <div className="grid gap-4 md:grid-cols-2">
           <Link href="/clients" passHref>
             <Card className="hover:border-primary transition-colors">
               <CardHeader className="flex flex-row items-center justify-between">
                 <div>
-                  <h3 className="font-semibold font-headline">Gerenciar Clientes</h3>
+                  <h3 className="font-semibold">Gerenciar Clientes</h3>
                   <p className="text-sm text-muted-foreground">Acesse os painéis e projetos de seus clientes.</p>
                 </div>
                 <Button size="icon" variant="ghost">
@@ -85,7 +85,7 @@ export default function DashboardPage() {
             <Card className="hover:border-primary transition-colors">
               <CardHeader className="flex flex-row items-center justify-between">
                 <div>
-                  <h3 className="font-semibold font-headline">Funil de Prospecção</h3>
+                  <h3 className="font-semibold">Funil de Prospecção</h3>
                   <p className="text-sm text-muted-foreground">Organize seus leads e follow-ups.</p>
                 </div>
                 <Button size="icon" variant="ghost">

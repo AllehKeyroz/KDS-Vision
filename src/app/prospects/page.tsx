@@ -1,50 +1,95 @@
 'use client';
 
-import { Card, CardContent } from '@/components/ui/card';
-import { PROSPECTS_DATA } from '@/lib/data';
-import type { Prospect } from '@/lib/types';
-import { UserCircle } from 'lucide-react';
+import { Button } from "@/components/ui/button";
+import { Calendar } from "@/components/ui/calendar";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { PROSPECTS_DATA } from "@/lib/data";
+import type { Prospect } from "@/lib/types";
+import { ChevronLeft, ChevronRight } from "lucide-react";
+import React from "react";
 
-const stages: Prospect['stage'][] = ['Contato Inicial', 'Follow-up', 'Proposta', 'Negociação'];
 
-const ProspectCard = ({ prospect }: { prospect: Prospect }) => (
-  <Card className="mb-4 bg-card/80 shadow-sm hover:shadow-md transition-shadow">
-    <CardContent className="p-4">
-      <h4 className="font-semibold font-headline">{prospect.name}</h4>
-      <div className="flex items-center gap-2 mt-2 text-sm text-muted-foreground">
-        <UserCircle className="w-4 h-4" />
-        <span>{prospect.contact}</span>
-      </div>
-    </CardContent>
-  </Card>
-);
+const PROSPECTS_LIST = [
+    { id: 'p1', name: 'Empresa A', status: 'Qualificado', nextFollowUp: '2024-07-15' },
+    { id: 'p2', name: 'Empresa B', status: 'Em Contato', nextFollowUp: '2024-07-10' },
+    { id: 'p3', name: 'Empresa C', status: 'Follow-up Agendado', nextFollowUp: '2024-07-20' },
+    { id: 'p4', name: 'Empresa D', status: 'Fechado', nextFollowUp: 'N/A' },
+    { id: 'p5', name: 'Empresa E', status: 'Qualificado', nextFollowUp: '2024-07-12' },
+];
 
 export default function ProspectsPage() {
+  const [date, setDate] = React.useState<Date | undefined>(new Date());
+
   return (
-    <div className="space-y-8">
-      <div>
-        <h1 className="text-3xl font-bold font-headline">Funil de Prospecção</h1>
-        <p className="text-muted-foreground">Gerencie seus leads e oportunidades de negócio.</p>
-      </div>
-      <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
-        {stages.map((stage) => (
-          <div key={stage} className="p-4 rounded-lg bg-primary/5">
-            <h3 className="mb-4 text-lg font-semibold text-center font-headline text-primary">{stage}</h3>
-            <div className="flex flex-col">
-              {PROSPECTS_DATA
-                .filter((p) => p.stage === stage)
-                .map((prospect) => (
-                  <ProspectCard key={prospect.id} prospect={prospect} />
-                ))}
-              {PROSPECTS_DATA.filter((p) => p.stage === stage).length === 0 && (
-                <div className="text-sm text-center py-10 border-2 border-dashed rounded-lg text-muted-foreground">
-                  Nenhum prospect nesta etapa.
-                </div>
-              )}
+    <div className="space-y-6">
+        <div className="flex flex-wrap justify-between items-center gap-4">
+            <h1 className="text-3xl font-bold tracking-tight">Gerenciar Prospecção</h1>
+            <Button variant="secondary">Adicionar Prospect</Button>
+        </div>
+
+        <section>
+            <h2 className="text-2xl font-bold tracking-tight mb-4">Lista de Prospects</h2>
+            <Card>
+                <Table>
+                    <TableHeader>
+                        <TableRow>
+                            <TableHead className="w-[250px]">Prospect</TableHead>
+                            <TableHead className="w-[150px]">Status</TableHead>
+                            <TableHead>Próximo Follow-up</TableHead>
+                            <TableHead className="text-right">Ações</TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        {PROSPECTS_LIST.map((prospect) => (
+                            <TableRow key={prospect.id}>
+                                <TableCell className="font-medium">{prospect.name}</TableCell>
+                                <TableCell>
+                                    <Button variant="secondary" size="sm" className="w-full">{prospect.status}</Button>
+                                </TableCell>
+                                <TableCell className="text-muted-foreground">{prospect.nextFollowUp}</TableCell>
+                                <TableCell className="text-right font-bold text-muted-foreground"><a href="#" className="hover:underline">Agendar Follow-up</a></TableCell>
+                            </TableRow>
+                        ))}
+                    </TableBody>
+                </Table>
+            </Card>
+        </section>
+
+        <section>
+            <h2 className="text-2xl font-bold tracking-tight mb-4">Calendário de Follow-ups</h2>
+            <div className="grid gap-6 md:grid-cols-1 lg:grid-cols-2">
+                <Card>
+                    <CardContent className="p-0">
+                        <Calendar
+                            mode="single"
+                            selected={date}
+                            onSelect={setDate}
+                            className="w-full"
+                            components={{
+                                IconLeft: ({ ...props }) => <ChevronLeft className="h-4 w-4" />,
+                                IconRight: ({ ...props }) => <ChevronRight className="h-4 w-4" />,
+                            }}
+                         />
+                    </CardContent>
+                </Card>
+                <Card>
+                    <CardContent className="p-0">
+                         <Calendar
+                            mode="single"
+                            selected={date}
+                            onSelect={setDate}
+                            month={new Date(new Date().setMonth(new Date().getMonth() + 1))}
+                            className="w-full"
+                            components={{
+                                IconLeft: ({ ...props }) => <ChevronLeft className="h-4 w-4" />,
+                                IconRight: ({ ...props }) => <ChevronRight className="h-4 w-4" />,
+                            }}
+                         />
+                    </CardContent>
+                </Card>
             </div>
-          </div>
-        ))}
-      </div>
+        </section>
     </div>
   );
 }

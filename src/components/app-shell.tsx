@@ -2,7 +2,7 @@
 'use client';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Briefcase, LayoutDashboard, Users, Zap } from 'lucide-react';
+import { Briefcase, LayoutDashboard, Users, Zap, Search, Folder, Megaphone, PresentationChart, Settings } from 'lucide-react';
 import {
   SidebarProvider,
   Sidebar,
@@ -17,6 +17,7 @@ import {
 } from '@/components/ui/sidebar';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from './ui/button';
+import { Input } from './ui/input';
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -25,11 +26,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     <SidebarProvider>
       <Sidebar>
         <SidebarHeader>
-          <div className="flex items-center gap-2">
-            <Button variant="ghost" size="icon" className="text-primary rounded-lg bg-primary/10">
-                <Zap className="w-6 h-6 fill-primary" />
-            </Button>
-            <h1 className="text-xl font-semibold font-headline text-primary">Keyroz Vision</h1>
+          <div className="flex flex-col">
+             <h1 className="text-base font-medium">Agência Digital</h1>
+             <p className="text-sm text-muted-foreground">Gerenciamento de Clientes</p>
           </div>
         </SidebarHeader>
         <SidebarContent>
@@ -46,17 +45,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               </Link>
             </SidebarMenuItem>
             <SidebarMenuItem>
-              <Link href="/prospects" legacyBehavior passHref>
-                <SidebarMenuButton
-                  isActive={pathname.startsWith('/prospects')}
-                  tooltip="Prospecção"
-                >
-                  <Briefcase />
-                  <span>Prospecção</span>
-                </SidebarMenuButton>
-              </Link>
-            </SidebarMenuItem>
-            <SidebarMenuItem>
               <Link href="/clients" legacyBehavior passHref>
                 <SidebarMenuButton
                   isActive={pathname.startsWith('/clients')}
@@ -67,23 +55,53 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 </SidebarMenuButton>
               </Link>
             </SidebarMenuItem>
+            <SidebarMenuItem>
+              <SidebarMenuButton
+                tooltip="Projetos"
+              >
+                <Folder />
+                <span>Projetos</span>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+            <SidebarMenuItem>
+              <SidebarMenuButton
+                tooltip="Campanhas"
+              >
+                <Megaphone />
+                <span>Campanhas</span>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+            <SidebarMenuItem>
+                <Link href="/prospects" legacyBehavior passHref>
+                    <SidebarMenuButton
+                    isActive={pathname.startsWith('/prospects')}
+                    tooltip="Prospecção"
+                    >
+                    <Search />
+                    <span>Prospecção</span>
+                    </SidebarMenuButton>
+                </Link>
+            </SidebarMenuItem>
+             <SidebarMenuItem>
+              <SidebarMenuButton
+                tooltip="Relatórios"
+              >
+                <PresentationChart />
+                <span>Relatórios</span>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+             <SidebarMenuItem>
+              <SidebarMenuButton
+                tooltip="Configurações"
+              >
+                <Settings />
+                <span>Configurações</span>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
           </SidebarMenu>
         </SidebarContent>
-        <SidebarFooter className="items-center hidden gap-2 group-data-[state=expanded]:flex">
-            <Avatar>
-                <AvatarImage src="https://placehold.co/40x40" alt="@gestor" />
-                <AvatarFallback>GV</AvatarFallback>
-            </Avatar>
-            <div className="flex flex-col">
-                <span className="text-sm font-semibold">Gestor</span>
-                <span className="text-xs text-muted-foreground">gestor@keyroz.com</span>
-            </div>
-        </SidebarFooter>
       </Sidebar>
       <SidebarInset className="bg-background min-h-svh">
-        <header className="sticky top-0 z-20 flex items-center justify-between p-4 bg-background/80 backdrop-blur-sm border-b">
-            <SidebarTrigger />
-        </header>
         <main className="flex-1 p-4 sm:p-6 lg:p-8">
             {children}
         </main>
