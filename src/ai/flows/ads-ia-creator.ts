@@ -1,3 +1,4 @@
+
 'use server';
 
 /**
@@ -88,7 +89,11 @@ Para cada **criativo**, você deve fornecer:
 - 3 opções de **CTAs** (Call to Action).
 - 3 ideias distintas para a **imagem ou vídeo** do anúncio.
 
-Finalmente, forneça uma sugestão de **orçamento geral** com uma recomendação de alocação e um **resumo estratégico**, explicando qual campanha você acredita que terá o melhor desempenho e por quê. Seja criativo, estratégico e detalhado.
+**IMPORTANTE: Ao final, você DEVE OBRIGATORIAMENTE fornecer:**
+1.  Um **orçamento geral** (overallBudget) com uma sugestão de valor total e recomendação de alocação.
+2.  Um **resumo estratégico** (summary), explicando qual campanha você acredita que terá o melhor desempenho e por quê.
+
+Seja criativo, estratégico e detalhado. Certifique-se de que sua resposta final siga estritamente o schema JSON de saída.
 `,
 });
 
@@ -103,3 +108,4 @@ const adsIACreatorFlow = ai.defineFlow(
     return output!;
   }
 );
+
