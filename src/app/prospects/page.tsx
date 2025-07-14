@@ -16,6 +16,7 @@ import { collection, addDoc, onSnapshot, doc, updateDoc, deleteDoc, serverTimest
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { format } from 'date-fns';
 
 export default function ProspectsPage() {
     const [prospects, setProspects] = useState<Prospect[]>([]);
@@ -29,7 +30,15 @@ export default function ProspectsPage() {
 
     useEffect(() => {
         const unsubscribe = onSnapshot(prospectsCollectionRef, (snapshot) => {
-            const prospectsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Prospect));
+            const prospectsData = snapshot.docs.map(doc => {
+                const data = doc.data();
+                return { 
+                    id: doc.id, 
+                    ...data,
+                    // Convert Firestore Timestamp to string for input[type=date]
+                    nextFollowUp: data.nextFollowUp && data.nextFollowUp.toDate ? format(data.nextFollowUp.toDate(), 'yyyy-MM-dd') : undefined
+                } as Prospect;
+            });
             setProspects(prospectsData);
             setIsLoading(false);
         });
@@ -50,11 +59,11 @@ export default function ProspectsPage() {
         event.preventDefault();
         setIsSaving(true);
         const formData = new FormData(event.currentTarget);
-        const prospectData: Omit<Prospect, 'id' | 'createdAt'> = {
+        const prospectData = {
             name: formData.get('name') as string,
             contact: formData.get('contact') as string,
             stage: formData.get('stage') as Prospect['stage'],
-            nextFollowUp: formData.get('nextFollowUp') as string,
+            nextFollowUp: formData.get('nextFollowUp') ? new Date(formData.get('nextFollowUp') as string) : null,
         };
 
         if (!prospectData.name || !prospectData.contact || !prospectData.stage) {
@@ -93,7 +102,7 @@ export default function ProspectsPage() {
     return (
         <div className="space-y-6">
             <div className="flex flex-wrap justify-between items-center gap-4">
-                <h1 className="text-3xl font-bold tracking-tight">Gerenciar Prospecção</h1>
+                <h1 className="text-3xl font-bold tracking-tight font-headline">Gerenciar Prospecção</h1>
                 <Button onClick={() => handleOpenDialog(null)}>
                     <PlusCircle className="mr-2 h-4 w-4" />
                     Adicionar Prospect
@@ -127,7 +136,7 @@ export default function ProspectsPage() {
                                                 {prospect.stage}
                                             </span>
                                         </TableCell>
-                                        <TableCell className="text-muted-foreground">{prospect.nextFollowUp ? new Date(prospect.nextFollowUp).toLocaleDateString() : 'N/A'}</TableCell>
+                                        <TableCell className="text-muted-foreground">{prospect.nextFollowUp ? new Date(prospect.nextFollowUp).toLocaleDateString('pt-BR', {timeZone: 'UTC'}) : 'N/A'}</TableCell>
                                         <TableCell className="text-right">
                                             <DropdownMenu>
                                                 <DropdownMenuTrigger asChild>
@@ -150,7 +159,7 @@ export default function ProspectsPage() {
                                                             <AlertDialogDescription>Esta ação não pode ser desfeita e removerá o prospect permanentemente.</AlertDialogDescription>
                                                             <AlertDialogFooter>
                                                                 <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                                                <AlertDialogAction onClick={() => handleDelete(prospect.id)}>Excluir</AlertDialogAction>
+                                                                <AlertDialogAction onClick={() => handleDelete(prospect.id)} className="bg-destructive hover:bg-destructive/90 text-destructive-foreground">Excluir</AlertDialogAction>
                                                             </AlertDialogFooter>
                                                         </AlertDialogContent>
                                                     </AlertDialog>
