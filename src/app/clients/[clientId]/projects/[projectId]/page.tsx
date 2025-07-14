@@ -57,12 +57,15 @@ export default function ProjectDetailPage() {
         const unsubscribeProject = onSnapshot(projectDocRef, (doc) => {
             if (doc.exists()) {
                 const data = { id: doc.id, ...doc.data() } as Project;
+                setProject(data);
+
+                // Auto-update status to 'Concluído'
                 const totalTasks = data.sections?.flatMap(s => s.tasks || []).length || 0;
                 const completedTasks = data.sections?.flatMap(s => s.tasks || []).filter(t => t.completed).length || 0;
                 if (totalTasks > 0 && completedTasks === totalTasks && data.status !== 'Concluído') {
                     updateDoc(projectDocRef, { status: 'Concluído' });
                 }
-                setProject(data);
+
             } else {
                 toast({ title: "Erro", description: "Projeto não encontrado.", variant: "destructive" });
                 router.push(`/clients/${clientId}/projects`);
@@ -150,12 +153,12 @@ export default function ProjectDetailPage() {
     };
 
     const filteredSections = useMemo(() => {
-        if (!project) return [];
+        if (!project || !project.sections) return [];
         if (!filters.responsible && !filters.deadline) {
             return project.sections;
         }
         return project.sections?.map(section => {
-            const filteredTasks = section.tasks.filter(task => {
+            const filteredTasks = (section.tasks || []).filter(task => {
                 const responsibleMatch = !filters.responsible || task.responsible === filters.responsible;
                 const deadlineMatch = !filters.deadline || (task.deadline && format(task.deadline.toDate(), 'yyyy-MM-dd') === format(filters.deadline, 'yyyy-MM-dd'));
                 return responsibleMatch && deadlineMatch;
@@ -291,7 +294,7 @@ export default function ProjectDetailPage() {
                             </AlertDialog>
                         </CardHeader>
                         <CardContent className="p-4 space-y-2">
-                            {section.tasks?.map(task => (
+                            {(section.tasks || []).map(task => (
                                 <div key={task.id} className="flex items-center gap-2 group p-2 rounded-md hover:bg-secondary/20">
                                     <Checkbox 
                                         id={task.id} 
@@ -307,9 +310,9 @@ export default function ProjectDetailPage() {
                                     ) : (
                                         <label htmlFor={task.id} className={`flex-1 text-sm ${task.completed ? 'line-through text-muted-foreground' : ''}`}>
                                             {task.text} 
-                                            <span className="text-xs text-muted-foreground ml-2">({task.responsible})</span>
+                                            {task.responsible && <span className="text-xs text-muted-foreground ml-2">({task.responsible})</span>}
                                             {task.deadline && (
-                                                <span className="text-xs bg-muted text-muted-foreground rounded px-1.5 py-0.5 ml-2">
+                                                <span className={cn("text-xs bg-muted text-muted-foreground rounded px-1.5 py-0.5 ml-2", new Date(task.deadline.toDate()) < new Date() && !task.completed ? 'text-red-400 bg-red-900/50' : '')}>
                                                     {format(task.deadline.toDate(), 'dd/MM/yy')}
                                                 </span>
                                             )}
@@ -317,7 +320,19 @@ export default function ProjectDetailPage() {
                                     )}
                                     <div className="opacity-0 group-hover:opacity-100 transition-opacity">
                                         <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => {setEditingItemId(task.id); setEditingText(task.text)}}><Pencil className="h-3 w-3"/></Button>
-                                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleDeleteTask(task.id)}><Trash2 className="h-3 w-3 text-destructive"/></Button>
+                                        <AlertDialog>
+                                            <AlertDialogTrigger asChild>
+                                                <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive"><Trash2 className="h-3 w-3"/></Button>
+                                            </AlertDialogTrigger>
+                                             <AlertDialogContent>
+                                                <AlertDialogHeader><AlertDialogTitle>Excluir Tarefa?</AlertDialogTitle></AlertDialogHeader>
+                                                <AlertDialogDescription>Essa ação não pode ser desfeita.</AlertDialogDescription>
+                                                <AlertDialogFooter>
+                                                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                                    <AlertDialogAction onClick={() => handleDeleteTask(task.id)}>Excluir</AlertDialogAction>
+                                                </AlertDialogFooter>
+                                            </AlertDialogContent>
+                                        </AlertDialog>
                                     </div>
                                 </div>
                             ))}

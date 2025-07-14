@@ -137,7 +137,7 @@ export default function UsersPage() {
                                 <TableCell className="font-medium">
                                     <div className="flex items-center gap-3">
                                         <Avatar>
-                                            <AvatarImage src={user.avatar} alt={user.name} />
+                                            <AvatarImage src={user.avatar} alt={user.name} data-ai-hint="avatar person" />
                                             <AvatarFallback>{user.name[0]}</AvatarFallback>
                                         </Avatar>
                                         <div>
@@ -160,7 +160,7 @@ export default function UsersPage() {
                                         </DropdownMenuItem>
                                          <AlertDialog>
                                             <AlertDialogTrigger asChild>
-                                                <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-destructive">
+                                                <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-destructive focus:text-destructive focus:bg-destructive/10">
                                                     <Trash2 className="mr-2 h-4 w-4" /> Excluir
                                                 </DropdownMenuItem>
                                             </AlertDialogTrigger>
@@ -169,7 +169,7 @@ export default function UsersPage() {
                                                 <AlertDialogDescription>Esta ação não pode ser desfeita e removerá o usuário permanentemente.</AlertDialogDescription>
                                                 <AlertDialogFooter>
                                                     <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                                    <AlertDialogAction onClick={() => handleDelete(user.id)}>Excluir</AlertDialogAction>
+                                                    <AlertDialogAction onClick={() => handleDelete(user.id)} className="bg-destructive hover:bg-destructive/90">Excluir</AlertDialogAction>
                                                 </AlertDialogFooter>
                                             </AlertDialogContent>
                                         </AlertDialog>
