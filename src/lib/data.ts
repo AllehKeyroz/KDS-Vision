@@ -8,12 +8,8 @@ export const PROSPECTS_DATA: Prospect[] = [
   { id: 'p5', name: 'Consultoria Financeira Futuro', stage: 'Contato Inicial', contact: 'Eduarda Martins' },
 ];
 
-export const CLIENTS_DATA: Client[] = [
-  { id: '1', name: 'Tech Inova Soluções', logo: 'https://placehold.co/64x64/2E9AFE/FFFFFF.png', contactPerson: 'Fernando Pereira', contactEmail: 'fernando@techinova.com', activeProjects: 3 },
-  { id: '2', name: 'Gourmet Express', logo: 'https://placehold.co/64x64/FF8C00/FFFFFF.png', contactPerson: 'Gabriela Oliveira', contactEmail: 'gabriela@gourmetexpress.com', activeProjects: 2 },
-  { id: '3', name: 'Moda & Estilo Boutique', logo: 'https://placehold.co/64x64/3c4043/FFFFFF.png', contactPerson: 'Heitor Santos', contactEmail: 'heitor@modaestilo.com', activeProjects: 5 },
-  { id: '4', name: 'Saúde em Foco Clínica', logo: 'https://placehold.co/64x64/1E88E5/FFFFFF.png', contactPerson: 'Isabela Ferreira', contactEmail: 'isabela@saudefoco.com', activeProjects: 1 },
-];
+// This data is now fetched from Firebase, so this constant is effectively a fallback or for reference.
+export const CLIENTS_DATA: Client[] = [];
 
 export const CLIENT_ACCESS_DATA: Record<string, ClientAccess[]> = {
   '1': [
