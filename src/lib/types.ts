@@ -12,6 +12,18 @@ export type Client = {
   contactPerson: string;
   contactEmail: string;
   activeProjects: number;
+  whatsapp?: string;
+  socialMedia?: {
+    instagram?: string;
+    facebook?: string;
+  };
+  address?: {
+    street?: string;
+    city?: string;
+    state?: string;
+    zip?: string;
+  };
+  additionalFields?: Record<string, any>;
 };
 
 export type ClientAccess = {
@@ -19,7 +31,6 @@ export type ClientAccess = {
   platform: string;
   link: string;
   login: string;
-  // In a real app, this should be handled securely and not stored in plaintext
   password_plain: string; 
   apiKey: string;
 };

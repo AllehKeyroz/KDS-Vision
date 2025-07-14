@@ -56,6 +56,17 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               </Link>
             </SidebarMenuItem>
             <SidebarMenuItem>
+                <Link href="/prospects" legacyBehavior passHref>
+                    <SidebarMenuButton
+                    isActive={pathname.startsWith('/prospects')}
+                    tooltip="Prospecção"
+                    >
+                    <Briefcase />
+                    <span>Prospecção</span>
+                    </SidebarMenuButton>
+                </Link>
+            </SidebarMenuItem>
+            <SidebarMenuItem>
               <SidebarMenuButton
                 tooltip="Projetos"
               >
@@ -70,17 +81,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 <Megaphone />
                 <span>Campanhas</span>
               </SidebarMenuButton>
-            </SidebarMenuItem>
-            <SidebarMenuItem>
-                <Link href="/prospects" legacyBehavior passHref>
-                    <SidebarMenuButton
-                    isActive={pathname.startsWith('/prospects')}
-                    tooltip="Prospecção"
-                    >
-                    <Search />
-                    <span>Prospecção</span>
-                    </SidebarMenuButton>
-                </Link>
             </SidebarMenuItem>
              <SidebarMenuItem>
               <SidebarMenuButton
