@@ -1,7 +1,7 @@
 'use client'
 
-import React, { useState, useEffect, useMemo } from 'react';
-import { useParams } from 'next/navigation';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { useParams, useRouter } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogTrigger, DialogClose } from '@/components/ui/dialog';
@@ -10,14 +10,21 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Progress } from '@/components/ui/progress';
-import { PlusCircle, Loader2, Edit, Trash2, MoreVertical } from 'lucide-react';
+import { PlusCircle, Loader2, Edit, Trash2, MoreVertical, CheckCircle2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { db } from '@/lib/firebase';
-import { collection, addDoc, onSnapshot, doc, updateDoc, deleteDoc } from 'firebase/firestore';
-import type { Project } from '@/lib/types';
+import { collection, addDoc, onSnapshot, doc, updateDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
+import type { Project, ProjectSection, Task } from '@/lib/types';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 
 export default function ProjectsPage() {
     const params = useParams();
+    const router = useRouter();
     const clientId = params.clientId as string;
     const { toast } = useToast();
 
@@ -25,7 +32,7 @@ export default function ProjectsPage() {
     const [isLoading, setIsLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
     const [isDialogOpen, setIsDialogOpen] = useState(false);
-    const [currentProject, setCurrentProject] = useState<Project | null>(null);
+    const [currentProject, setCurrentProject] = useState<Partial<Project> | null>(null);
 
     const projectsCollectionRef = useMemo(() => collection(db, 'clients', clientId, 'projects'), [clientId]);
 
@@ -38,7 +45,7 @@ export default function ProjectsPage() {
         return () => unsubscribe();
     }, [projectsCollectionRef]);
 
-    const handleOpenDialog = (project: Project | null) => {
+    const handleOpenDialog = (project: Partial<Project> | null) => {
         setCurrentProject(project);
         setIsDialogOpen(true);
     };
@@ -52,11 +59,10 @@ export default function ProjectsPage() {
         event.preventDefault();
         setIsSaving(true);
         const formData = new FormData(event.currentTarget);
-        const projectData = {
+        const projectData: Omit<Project, 'id' | 'createdAt' | 'sections'> = {
             name: formData.get('name') as string,
             scope: formData.get('scope') as string,
             value: Number(formData.get('value')),
-            progress: Number(formData.get('progress')),
             status: formData.get('status') as Project['status'],
         };
 
@@ -67,12 +73,12 @@ export default function ProjectsPage() {
         }
 
         try {
-            if (currentProject) {
+            if (currentProject && currentProject.id) {
                 const docRef = doc(db, 'clients', clientId, 'projects', currentProject.id);
                 await updateDoc(docRef, projectData);
                 toast({ title: "Projeto Atualizado!", description: "O projeto foi atualizado com sucesso." });
             } else {
-                await addDoc(projectsCollectionRef, projectData);
+                await addDoc(projectsCollectionRef, { ...projectData, createdAt: serverTimestamp(), sections: [] });
                 toast({ title: "Projeto Adicionado!", description: "O novo projeto foi criado." });
             }
             handleCloseDialog();
@@ -92,6 +98,15 @@ export default function ProjectsPage() {
             toast({ title: "Erro ao remover", description: "Não foi possível remover o projeto.", variant: "destructive" });
         }
     };
+
+    const calculateProgress = useCallback((project: Project): number => {
+        const sections = project.sections || [];
+        const allTasks = sections.flatMap(s => s.tasks || []);
+        if (allTasks.length === 0) return 0;
+
+        const completedTasks = allTasks.filter(t => t.completed).length;
+        return Math.round((completedTasks / allTasks.length) * 100);
+    }, []);
 
     return (
         <div className="space-y-6">
@@ -116,18 +131,21 @@ export default function ProjectsPage() {
                 </Card>
             ) : (
                 <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-                    {projects.map(project => (
-                        <Card key={project.id}>
-                            <CardHeader>
+                    {projects.map(project => {
+                       const progress = calculateProgress(project);
+                       const isCompleted = progress === 100;
+                        return (
+                        <Card key={project.id} className={`cursor-pointer hover:border-primary transition-all ${isCompleted ? 'border-green-500/50' : ''}`} onClick={() => router.push(`/clients/${clientId}/projects/${project.id}`)}>
+                             <CardHeader>
                                 <div className="flex justify-between items-start">
-                                    <CardTitle className="max-w-[90%]">{project.name}</CardTitle>
+                                     <CardTitle className="max-w-[90%] flex items-center gap-2">{isCompleted && <CheckCircle2 className="text-green-500"/>}{project.name}</CardTitle>
                                     <DropdownMenu>
                                       <DropdownMenuTrigger asChild>
-                                        <Button variant="ghost" size="icon" className="h-8 w-8 -mt-2 -mr-2">
+                                        <Button variant="ghost" size="icon" className="h-8 w-8 -mt-2 -mr-2" onClick={(e) => e.stopPropagation()}>
                                           <MoreVertical className="h-4 w-4" />
                                         </Button>
                                       </DropdownMenuTrigger>
-                                      <DropdownMenuContent>
+                                      <DropdownMenuContent onClick={(e) => e.stopPropagation()}>
                                         <DropdownMenuItem onClick={() => handleOpenDialog(project)}>
                                           <Edit className="mr-2 h-4 w-4" /> Editar
                                         </DropdownMenuItem>
@@ -146,25 +164,25 @@ export default function ProjectsPage() {
                                 </div>
                                 <div>
                                     <Label className="text-xs">Status</Label>
-                                    <p className="text-sm font-semibold">{project.status}</p>
+                                    <p className="text-sm font-semibold">{isCompleted ? 'Concluído' : project.status}</p>
                                 </div>
                                 <div>
                                     <Label className="text-xs">Progresso</Label>
                                     <div className="flex items-center gap-2">
-                                        <Progress value={project.progress} className="w-full" />
-                                        <span className="text-sm font-medium">{project.progress}%</span>
+                                        <Progress value={progress} className="w-full" />
+                                        <span className="text-sm font-medium">{progress}%</span>
                                     </div>
                                 </div>
                             </CardContent>
                         </Card>
-                    ))}
+                    )})}
                 </div>
             )}
 
             <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
                 <DialogContent>
                     <DialogHeader>
-                        <DialogTitle>{currentProject ? 'Editar Projeto' : 'Adicionar Novo Projeto'}</DialogTitle>
+                        <DialogTitle>{currentProject?.id ? 'Editar Projeto' : 'Adicionar Novo Projeto'}</DialogTitle>
                         <DialogDescription>
                             Preencha as informações abaixo para gerenciar o projeto.
                         </DialogDescription>
@@ -198,10 +216,6 @@ export default function ProjectsPage() {
                                 </Select>
                             </div>
                         </div>
-                        <div>
-                            <Label htmlFor="progress">Progresso ({currentProject?.progress || 0}%)</Label>
-                            <Input id="progress" name="progress" type="range" min="0" max="100" defaultValue={currentProject?.progress} onChange={(e) => setCurrentProject(p => p ? {...p, progress: Number(e.target.value)} : null)} />
-                        </div>
                         <DialogFooter>
                             <Button type="button" variant="outline" onClick={handleCloseDialog}>Cancelar</Button>
                             <Button type="submit" disabled={isSaving}>
@@ -216,11 +230,3 @@ export default function ProjectsPage() {
         </div>
     );
 }
-
-// Minimal Dropdown for the example
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"

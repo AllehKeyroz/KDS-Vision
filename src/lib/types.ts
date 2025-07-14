@@ -56,14 +56,29 @@ export interface SocialSession {
   createdAt: any; // Firestore Timestamp
 }
 
+export interface Task {
+  id: string;
+  text: string;
+  responsible: string;
+  completed: boolean;
+}
+
+export interface ProjectSection {
+  id: string;
+  title: string;
+  tasks: Task[];
+}
+
 export interface Project {
   id: string;
   name: string;
   scope: string;
   value: number;
-  progress: number;
   status: 'Planejamento' | 'Em Andamento' | 'Pausado' | 'Concluído';
+  sections?: ProjectSection[];
+  createdAt?: any;
 }
+
 
 export interface AdsCampaign {
   id: string;
