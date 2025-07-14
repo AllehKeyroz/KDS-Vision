@@ -99,7 +99,8 @@ export default function ProjectDetailPage() {
     };
     
     const handleDeleteSection = async (section: ProjectSection) => {
-        await updateDoc(projectDocRef, { sections: arrayRemove(section) });
+        const updatedSections = project?.sections?.filter(s => s.id !== section.id);
+        await updateDoc(projectDocRef, { sections: updatedSections });
         toast({ title: "Seção Removida!", variant: "destructive"});
     };
 
@@ -247,7 +248,7 @@ export default function ProjectDetailPage() {
                             <PopoverContent className="w-auto p-0">
                                 <Calendar
                                 mode="single"
-                                selected={filters.deadline}
+                                selected={filters.deadline as Date | undefined}
                                 onSelect={(date) => setFilters(f => ({...f, deadline: date || null}))}
                                 initialFocus
                                 />
@@ -343,7 +344,7 @@ export default function ProjectDetailPage() {
                                     value={newTask[section.id]?.text || ""}
                                     onChange={(e) => setNewTask(prev => ({...prev, [section.id]: {...(prev[section.id] || {responsible: ''}), text: e.target.value}}))}
                                 />
-                                <Select onValueChange={(value) => setNewTask(prev => ({...prev, [section.id]: {...(prev[section.id] || {text: ''}), responsible: value}}))}>
+                                <Select onValueChange={(value) => setNewTask(prev => ({...prev, [section.id]: {...(prev[section.id] || {text: ''}), responsible: value}}))} value={newTask[section.id]?.responsible || ''}>
                                     <SelectTrigger className="h-9 w-[180px]">
                                         <SelectValue placeholder="Responsável..." />
                                     </SelectTrigger>
@@ -370,7 +371,7 @@ export default function ProjectDetailPage() {
                                         <Calendar
                                         mode="single"
                                         selected={newTask[section.id]?.deadline}
-                                        onSelect={(date) => setNewTask(prev => ({...prev, [section.id]: {...(prev[section.id] || {text: '', responsible: ''}), deadline: date}}))}
+                                        onSelect={(date) => setNewTask(prev => ({...prev, [section.id]: {...(prev[section.id] || {text: '', responsible: ''}), deadline: date as Date}}))}
                                         initialFocus
                                         />
                                     </PopoverContent>
