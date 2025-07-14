@@ -34,3 +34,28 @@ export type ClientAccess = {
   password_plain: string; 
   apiKey: string;
 };
+
+export interface BrainstormSession {
+  id: string;
+  title: string;
+  ideas: { text: string; completed: boolean }[];
+  tasks: { text: string; completed: boolean }[];
+  createdAt: any; // Firestore Timestamp
+}
+
+export interface SocialSession {
+  id: string;
+  title: string;
+  postIdeas: { text: string; completed: boolean }[];
+  contentStrategy: string;
+  createdAt: any; // Firestore Timestamp
+}
+
+export interface Project {
+  id: string;
+  name: string;
+  scope: string;
+  value: number;
+  progress: number;
+  status: 'Planejamento' | 'Em Andamento' | 'Pausado' | 'Concluído';
+}
