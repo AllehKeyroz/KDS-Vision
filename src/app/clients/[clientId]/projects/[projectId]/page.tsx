@@ -8,11 +8,15 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Progress } from '@/components/ui/progress';
-import { PlusCircle, Loader2, Trash2, GripVertical, Check, X, Pencil, CheckCircle2 } from 'lucide-react';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
+import { PlusCircle, Loader2, Trash2, GripVertical, Check, X, Pencil, CheckCircle2, ArrowLeft, CalendarIcon, Filter, User } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { db } from '@/lib/firebase';
-import { collection, onSnapshot, doc, updateDoc, arrayUnion, arrayRemove, getDoc } from 'firebase/firestore';
-import type { Project, ProjectSection, Task } from '@/lib/types';
+import { collection, onSnapshot, doc, updateDoc, arrayUnion, arrayRemove, getDoc, Timestamp } from 'firebase/firestore';
+import type { Project, ProjectSection, Task, User as AppUser } from '@/lib/types';
+import { cn } from '@/lib/utils';
+import { format } from 'date-fns';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -24,6 +28,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 export default function ProjectDetailPage() {
     const params = useParams();
@@ -34,14 +39,22 @@ export default function ProjectDetailPage() {
     const [project, setProject] = useState<Project | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [newSectionTitle, setNewSectionTitle] = useState("");
-    const [newTask, setNewTask] = useState<{ [key: string]: { text: string; responsible: string } }>({});
+    const [newTask, setNewTask] = useState<{ [key: string]: { text: string; responsible: string, deadline?: Date } }>({});
     const [editingItemId, setEditingItemId] = useState<string | null>(null);
     const [editingText, setEditingText] = useState("");
+    
+    const [users, setUsers] = useState<AppUser[]>([]);
+    const [filters, setFilters] = useState({ responsible: '', deadline: null as Date | null });
 
     const projectDocRef = useMemo(() => doc(db, 'clients', clientId as string, 'projects', projectId as string), [clientId, projectId]);
+    const usersCollectionRef = useMemo(() => collection(db, 'users'), []);
 
     useEffect(() => {
-        const unsubscribe = onSnapshot(projectDocRef, (doc) => {
+        const unsubscribeUsers = onSnapshot(usersCollectionRef, (snapshot) => {
+            setUsers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as AppUser)));
+        });
+
+        const unsubscribeProject = onSnapshot(projectDocRef, (doc) => {
             if (doc.exists()) {
                 const data = { id: doc.id, ...doc.data() } as Project;
                 const totalTasks = data.sections?.flatMap(s => s.tasks || []).length || 0;
@@ -52,12 +65,15 @@ export default function ProjectDetailPage() {
                 setProject(data);
             } else {
                 toast({ title: "Erro", description: "Projeto não encontrado.", variant: "destructive" });
-                router.back();
+                router.push(`/clients/${clientId}/projects`);
             }
             setIsLoading(false);
         });
-        return () => unsubscribe();
-    }, [projectDocRef, router, toast]);
+        return () => {
+            unsubscribeProject();
+            unsubscribeUsers();
+        };
+    }, [projectDocRef, router, toast, clientId, usersCollectionRef]);
 
     const calculateProgress = () => {
         if (!project || !project.sections) return 0;
@@ -92,6 +108,7 @@ export default function ProjectDetailPage() {
             text: taskInput.text.trim(),
             responsible: taskInput.responsible.trim(),
             completed: false,
+            ...(taskInput.deadline && { deadline: Timestamp.fromDate(taskInput.deadline) })
         };
         
         const updatedSections = project?.sections?.map(s => {
@@ -132,6 +149,21 @@ export default function ProjectDetailPage() {
         await updateDoc(projectDocRef, { sections: updatedSections });
     };
 
+    const filteredSections = useMemo(() => {
+        if (!project) return [];
+        if (!filters.responsible && !filters.deadline) {
+            return project.sections;
+        }
+        return project.sections?.map(section => {
+            const filteredTasks = section.tasks.filter(task => {
+                const responsibleMatch = !filters.responsible || task.responsible === filters.responsible;
+                const deadlineMatch = !filters.deadline || (task.deadline && format(task.deadline.toDate(), 'yyyy-MM-dd') === format(filters.deadline, 'yyyy-MM-dd'));
+                return responsibleMatch && deadlineMatch;
+            });
+            return { ...section, tasks: filteredTasks };
+        }).filter(section => section.tasks.length > 0);
+    }, [project, filters]);
+
     if (isLoading) {
         return <div className="flex justify-center items-center h-64"><Loader2 className="h-8 w-8 animate-spin" /></div>;
     }
@@ -145,6 +177,11 @@ export default function ProjectDetailPage() {
 
     return (
         <div className="space-y-6">
+            <Button variant="outline" onClick={() => router.push(`/clients/${clientId}/projects`)} className="mb-4">
+                <ArrowLeft className="mr-2 h-4 w-4" />
+                Voltar para Projetos
+            </Button>
+
             <Card>
                 <CardHeader>
                     <div className="flex justify-between items-start">
@@ -170,6 +207,56 @@ export default function ProjectDetailPage() {
                 </CardContent>
             </Card>
 
+            <Card>
+                <CardHeader>
+                    <CardTitle className="flex items-center gap-2"><Filter className="h-5 w-5"/> Filtros</CardTitle>
+                </CardHeader>
+                <CardContent className="flex flex-col md:flex-row gap-4">
+                    <div className="flex-1 space-y-2">
+                        <Label>Responsável</Label>
+                        <Select onValueChange={(value) => setFilters(f => ({...f, responsible: value === 'all' ? '' : value}))}>
+                            <SelectTrigger>
+                                <SelectValue placeholder="Filtrar por responsável..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all">Todos</SelectItem>
+                                {users.map(user => (
+                                    <SelectItem key={user.id} value={user.name}>{user.name}</SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </div>
+                     <div className="flex-1 space-y-2">
+                        <Label>Data de Entrega</Label>
+                        <Popover>
+                            <PopoverTrigger asChild>
+                                <Button
+                                variant={"outline"}
+                                className={cn(
+                                    "w-full justify-start text-left font-normal",
+                                    !filters.deadline && "text-muted-foreground"
+                                )}
+                                >
+                                <CalendarIcon className="mr-2 h-4 w-4" />
+                                {filters.deadline ? format(filters.deadline, "PPP") : <span>Escolha uma data</span>}
+                                </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0">
+                                <Calendar
+                                mode="single"
+                                selected={filters.deadline}
+                                onSelect={(date) => setFilters(f => ({...f, deadline: date || null}))}
+                                initialFocus
+                                />
+                            </PopoverContent>
+                        </Popover>
+                    </div>
+                    <div className="flex items-end">
+                        <Button variant="ghost" onClick={() => setFilters({ responsible: '', deadline: null })}>Limpar Filtros</Button>
+                    </div>
+                </CardContent>
+            </Card>
+
             <div className="space-y-4">
                  <div className="flex items-center gap-2">
                     <Input 
@@ -183,7 +270,7 @@ export default function ProjectDetailPage() {
             </div>
 
             <div className="space-y-6">
-                {project.sections?.map(section => (
+                {filteredSections.map(section => (
                     <Card key={section.id}>
                         <CardHeader className="flex flex-row justify-between items-center bg-secondary/30 p-4">
                             <h3 className="font-headline text-lg flex items-center gap-2"><GripVertical className="cursor-grab"/>{section.title}</h3>
@@ -221,6 +308,11 @@ export default function ProjectDetailPage() {
                                         <label htmlFor={task.id} className={`flex-1 text-sm ${task.completed ? 'line-through text-muted-foreground' : ''}`}>
                                             {task.text} 
                                             <span className="text-xs text-muted-foreground ml-2">({task.responsible})</span>
+                                            {task.deadline && (
+                                                <span className="text-xs bg-muted text-muted-foreground rounded px-1.5 py-0.5 ml-2">
+                                                    {format(task.deadline.toDate(), 'dd/MM/yy')}
+                                                </span>
+                                            )}
                                         </label>
                                     )}
                                     <div className="opacity-0 group-hover:opacity-100 transition-opacity">
@@ -229,19 +321,45 @@ export default function ProjectDetailPage() {
                                     </div>
                                 </div>
                             ))}
-                            <div className="flex items-center gap-2 pt-4">
+                            <div className="flex items-center gap-2 pt-4 flex-wrap">
                                 <Input 
                                     placeholder="Adicionar nova tarefa..." 
-                                    className="h-9"
+                                    className="h-9 flex-1 min-w-[200px]"
                                     value={newTask[section.id]?.text || ""}
                                     onChange={(e) => setNewTask(prev => ({...prev, [section.id]: {...(prev[section.id] || {responsible: ''}), text: e.target.value}}))}
                                 />
-                                <Input 
-                                    placeholder="Responsável"
-                                     className="h-9 w-48"
-                                    value={newTask[section.id]?.responsible || ""}
-                                    onChange={(e) => setNewTask(prev => ({...prev, [section.id]: {...(prev[section.id] || {text: ''}), responsible: e.target.value}}))}
-                                />
+                                <Select onValueChange={(value) => setNewTask(prev => ({...prev, [section.id]: {...(prev[section.id] || {text: ''}), responsible: value}}))}>
+                                    <SelectTrigger className="h-9 w-[180px]">
+                                        <SelectValue placeholder="Responsável..." />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {users.map(user => (
+                                            <SelectItem key={user.id} value={user.name}>{user.name}</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                                <Popover>
+                                    <PopoverTrigger asChild>
+                                        <Button
+                                        variant={"outline"}
+                                        className={cn(
+                                            "h-9 w-[180px] justify-start text-left font-normal",
+                                            !newTask[section.id]?.deadline && "text-muted-foreground"
+                                        )}
+                                        >
+                                        <CalendarIcon className="mr-2 h-4 w-4" />
+                                        {newTask[section.id]?.deadline ? format(newTask[section.id].deadline, "PPP") : <span>Prazo</span>}
+                                        </Button>
+                                    </PopoverTrigger>
+                                    <PopoverContent className="w-auto p-0">
+                                        <Calendar
+                                        mode="single"
+                                        selected={newTask[section.id]?.deadline}
+                                        onSelect={(date) => setNewTask(prev => ({...prev, [section.id]: {...(prev[section.id] || {text: '', responsible: ''}), deadline: date}}))}
+                                        initialFocus
+                                        />
+                                    </PopoverContent>
+                                </Popover>
                                 <Button size="sm" onClick={() => handleAddTask(section.id)}>Adicionar</Button>
                             </div>
                         </CardContent>

@@ -1,4 +1,4 @@
-import type { Client, Prospect, ClientAccess } from './types';
+import type { Client, Prospect, ClientAccess, User } from './types';
 
 export const PROSPECTS_DATA: Prospect[] = [
   { id: 'p1', name: 'Café Delícia', stage: 'Contato Inicial', contact: 'Ana Costa' },
@@ -10,6 +10,7 @@ export const PROSPECTS_DATA: Prospect[] = [
 
 // This data is now fetched from Firebase, so this constant is effectively a fallback or for reference.
 export const CLIENTS_DATA: Client[] = [];
+export const USERS_DATA: User[] = [];
 
 export const CLIENT_ACCESS_DATA: Record<string, ClientAccess[]> = {
   '1': [

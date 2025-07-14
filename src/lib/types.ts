@@ -61,6 +61,7 @@ export interface Task {
   text: string;
   responsible: string;
   completed: boolean;
+  deadline?: any; // Firestore Timestamp
 }
 
 export interface ProjectSection {
@@ -87,6 +88,15 @@ export interface AdsCampaign {
   response: AdsIACreatorOutput;
   createdAt: any; // Firestore Timestamp
 }
+
+export interface User {
+  id: string;
+  name: string;
+  email: string;
+  role: 'Admin' | 'Gestor' | 'Analista';
+  avatar: string;
+}
+
 
 // Re-exporting AI types to be used in the UI
 export type { AdsIACreatorInput };
