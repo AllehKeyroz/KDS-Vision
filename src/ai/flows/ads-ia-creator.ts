@@ -25,6 +25,9 @@ const AdsIACreatorInputSchema = z.object({
   targetAudience: z
     .string()
     .describe('A description of the target audience for the ad campaign.'),
+  numCampaigns: z.number().describe('The number of campaigns to generate.'),
+  numAdSets: z.number().describe('The number of ad sets to generate per campaign.'),
+  numCreatives: z.number().describe('The number of creatives to generate per ad set.'),
 });
 export type AdsIACreatorInput = z.infer<typeof AdsIACreatorInputSchema>;
 
@@ -41,16 +44,16 @@ const AdSetSchema = z.object({
     adSetName: z.string().describe('O nome do conjunto de anúncios (Ex: "Público Frio - Interesses").'),
     targeting: z.string().describe('Os critérios de direcionamento para este conjunto (público, idade, interesses).'),
     budget: z.number().describe('O orçamento diário ou vitalício sugerido para este conjunto.'),
-    creatives: z.array(CreativeSchema).describe('Uma lista de 5 criativos para este conjunto de anúncios.')
+    creatives: z.array(CreativeSchema).describe('Uma lista de criativos para este conjunto de anúncios.')
 });
 
 const CampaignSchema = z.object({
     campaignName: z.string().describe('O nome da campanha (Ex: "Lançamento Produto X - Vendas").'),
-    adSets: z.array(AdSetSchema).describe('Uma lista de 3 conjuntos de anúncios para esta campanha.')
+    adSets: z.array(AdSetSchema).describe('Uma lista de conjuntos de anúncios para esta campanha.')
 });
 
 const AdsIACreatorOutputSchema = z.object({
-  campaigns: z.array(CampaignSchema).describe('Uma lista de 3 estruturas de campanha completas.'),
+  campaigns: z.array(CampaignSchema).describe('Uma lista de estruturas de campanha completas.'),
   overallBudget: z.object({
       suggestion: z.number().describe('Uma sugestão de orçamento total para todas as campanhas.'),
       allocation: z.string().describe('Uma recomendação de como alocar o orçamento entre as campanhas.'),
@@ -81,7 +84,7 @@ const prompt = ai.definePrompt({
 **Público-alvo:**
 {{{targetAudience}}}
 
-Com base nessas informações, gere uma estrutura detalhada de publicidade. Você deve criar **3 campanhas distintas**, cada uma com um ângulo ou objetivo ligeiramente diferente. Dentro de cada campanha, crie **3 conjuntos de anúncios** com diferentes segmentações de público. Para cada conjunto de anúncios, desenvolva **5 ideias de criativos**.
+Com base nessas informações, gere uma estrutura detalhada de publicidade. Você deve criar **{{{numCampaigns}}} campanhas distintas**, cada uma com um ângulo ou objetivo ligeiramente diferente. Dentro de cada campanha, crie **{{{numAdSets}}} conjuntos de anúncios** com diferentes segmentações de público. Para cada conjunto de anúncios, desenvolva **{{{numCreatives}}} ideias de criativos**.
 
 Para cada **criativo**, você deve fornecer:
 - 3 opções de **títulos** persuasivos.
@@ -89,11 +92,11 @@ Para cada **criativo**, você deve fornecer:
 - 3 opções de **CTAs** (Call to Action).
 - 3 ideias distintas para a **imagem ou vídeo** do anúncio.
 
-**IMPORTANTE: Ao final, você DEVE OBRIGATORIAMENTE fornecer:**
-1.  Um **orçamento geral** (overallBudget) com uma sugestão de valor total e recomendação de alocação.
-2.  Um **resumo estratégico** (summary), explicando qual campanha você acredita que terá o melhor desempenho e por quê.
+**IMPORTANTE: Ao final, você DEVE OBRIGATORIAMENTE fornecer os seguintes campos no JSON de saída:**
+1.  **overallBudget**: Um objeto contendo uma sugestão de orçamento total (suggestion) e uma recomendação de alocação (allocation).
+2.  **summary**: Um resumo estratégico conciso, explicando qual campanha você acredita que terá o melhor desempenho e por quê.
 
-Seja criativo, estratégico e detalhado. Certifique-se de que sua resposta final siga estritamente o schema JSON de saída.
+Seja criativo, estratégico e detalhado. Certifique-se de que sua resposta final siga estritamente o schema JSON de saída, incluindo todos os campos obrigatórios.
 `,
 });
 
@@ -108,4 +111,3 @@ const adsIACreatorFlow = ai.defineFlow(
     return output!;
   }
 );
-

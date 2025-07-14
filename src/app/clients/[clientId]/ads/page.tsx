@@ -25,6 +25,9 @@ export default function AdsCreatorPage() {
         advertisingGoal: '',
         productOrService: '',
         targetAudience: '',
+        numCampaigns: 1,
+        numAdSets: 1,
+        numCreatives: 1,
     });
     const [result, setResult] = useState<AdsIACreatorOutput | null>(null);
     const [isLoading, setIsLoading] = useState(false);
@@ -35,7 +38,11 @@ export default function AdsCreatorPage() {
         .join('\n');
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-        setFormData({ ...formData, [e.target.id]: e.target.value });
+        const { id, value, type } = e.target;
+        setFormData({ 
+            ...formData, 
+            [id]: type === 'number' ? parseInt(value, 10) || 0 : value 
+        });
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -52,7 +59,15 @@ export default function AdsCreatorPage() {
         setResult(null);
 
         try {
-            const response = await runAdsCreator({ clientContext, ...formData });
+            const response = await runAdsCreator({ 
+                clientContext, 
+                advertisingGoal: formData.advertisingGoal,
+                productOrService: formData.productOrService,
+                targetAudience: formData.targetAudience,
+                numCampaigns: formData.numCampaigns,
+                numAdSets: formData.numAdSets,
+                numCreatives: formData.numCreatives,
+             });
             setResult(response);
         } catch (error) {
             toast({
@@ -89,6 +104,22 @@ export default function AdsCreatorPage() {
                             <div className="space-y-2">
                                 <Label htmlFor="targetAudience">Público-alvo Detalhado</Label>
                                 <Textarea id="targetAudience" value={formData.targetAudience} onChange={handleChange} placeholder="Ex: Corredores amadores, 25-40 anos, interessados em maratonas" rows={3} />
+                            </div>
+                            <Separator/>
+                            <CardDescription>Defina a estrutura da campanha</CardDescription>
+                            <div className="grid grid-cols-3 gap-2">
+                               <div className="space-y-2">
+                                    <Label htmlFor="numCampaigns">Campanhas</Label>
+                                    <Input id="numCampaigns" type="number" value={formData.numCampaigns} onChange={handleChange} min="1" max="5"/>
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="numAdSets">Conjuntos</Label>
+                                    <Input id="numAdSets" type="number" value={formData.numAdSets} onChange={handleChange} min="1" max="5"/>
+                                </div>
+                                 <div className="space-y-2">
+                                    <Label htmlFor="numCreatives">Criativos</Label>
+                                    <Input id="numCreatives" type="number" value={formData.numCreatives} onChange={handleChange} min="1" max="5"/>
+                                </div>
                             </div>
                             <Button type="submit" disabled={isLoading} className="w-full">
                                 {isLoading ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Gerando Campanha...</> : <><Wand2 className="w-4 h-4 mr-2" /> Gerar Estrutura de Campanha</>}
