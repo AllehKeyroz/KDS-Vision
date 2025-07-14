@@ -80,6 +80,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
              <SidebarMenuItem>
               <SidebarMenuButton
                 tooltip="Relatórios"
+                disabled
               >
                 <Presentation />
                 <span>Relatórios</span>
@@ -88,6 +89,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
              <SidebarMenuItem>
               <SidebarMenuButton
                 tooltip="Configurações"
+                disabled
               >
                 <Settings />
                 <span>Configurações</span>

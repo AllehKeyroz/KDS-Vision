@@ -1,4 +1,5 @@
 import type { AdsIACreatorInput, AdsIACreatorOutput as AdsOutput } from "@/ai/flows/ads-ia-creator";
+import type { Timestamp } from "firebase/firestore";
 
 // Custom type for the UI to be less verbose
 export interface AdsIACreatorOutput extends AdsOutput {}
@@ -6,8 +7,10 @@ export interface AdsIACreatorOutput extends AdsOutput {}
 export type Prospect = {
   id: string;
   name: string;
-  stage: 'Contato Inicial' | 'Follow-up' | 'Proposta' | 'Negociação';
+  stage: 'Contato Inicial' | 'Qualificado' | 'Proposta Enviada' | 'Follow-up' | 'Negociação' | 'Fechado' | 'Perdido';
   contact: string;
+  nextFollowUp?: string;
+  createdAt?: Timestamp;
 };
 
 export type Client = {

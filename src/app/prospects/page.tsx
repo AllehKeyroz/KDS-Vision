@@ -1,95 +1,224 @@
+
 'use client';
 
+import React, { useState, useEffect, useMemo } from 'react';
 import { Button } from "@/components/ui/button";
-import { Calendar } from "@/components/ui/calendar";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { PROSPECTS_DATA } from "@/lib/data";
 import type { Prospect } from "@/lib/types";
-import { ChevronLeft, ChevronRight } from "lucide-react";
-import React from "react";
-
-
-const PROSPECTS_LIST = [
-    { id: 'p1', name: 'Empresa A', status: 'Qualificado', nextFollowUp: '2024-07-15' },
-    { id: 'p2', name: 'Empresa B', status: 'Em Contato', nextFollowUp: '2024-07-10' },
-    { id: 'p3', name: 'Empresa C', status: 'Follow-up Agendado', nextFollowUp: '2024-07-20' },
-    { id: 'p4', name: 'Empresa D', status: 'Fechado', nextFollowUp: 'N/A' },
-    { id: 'p5', name: 'Empresa E', status: 'Qualificado', nextFollowUp: '2024-07-12' },
-];
+import { PlusCircle, Loader2, MoreVertical, Edit, Trash2 } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogTrigger, DialogClose } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { useToast } from '@/hooks/use-toast';
+import { db } from '@/lib/firebase';
+import { collection, addDoc, onSnapshot, doc, updateDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 
 export default function ProspectsPage() {
-  const [date, setDate] = React.useState<Date | undefined>(new Date());
+    const [prospects, setProspects] = useState<Prospect[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
+    const [isSaving, setIsSaving] = useState(false);
+    const [isDialogOpen, setIsDialogOpen] = useState(false);
+    const [currentProspect, setCurrentProspect] = useState<Partial<Prospect> | null>(null);
+    const { toast } = useToast();
 
-  return (
-    <div className="space-y-6">
-        <div className="flex flex-wrap justify-between items-center gap-4">
-            <h1 className="text-3xl font-bold tracking-tight">Gerenciar Prospecção</h1>
-            <Button variant="secondary">Adicionar Prospect</Button>
-        </div>
+    const prospectsCollectionRef = useMemo(() => collection(db, 'prospects'), []);
 
-        <section>
-            <h2 className="text-2xl font-bold tracking-tight mb-4">Lista de Prospects</h2>
-            <Card>
-                <Table>
-                    <TableHeader>
-                        <TableRow>
-                            <TableHead className="w-[250px]">Prospect</TableHead>
-                            <TableHead className="w-[150px]">Status</TableHead>
-                            <TableHead>Próximo Follow-up</TableHead>
-                            <TableHead className="text-right">Ações</TableHead>
-                        </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                        {PROSPECTS_LIST.map((prospect) => (
-                            <TableRow key={prospect.id}>
-                                <TableCell className="font-medium">{prospect.name}</TableCell>
-                                <TableCell>
-                                    <Button variant="secondary" size="sm" className="w-full">{prospect.status}</Button>
-                                </TableCell>
-                                <TableCell className="text-muted-foreground">{prospect.nextFollowUp}</TableCell>
-                                <TableCell className="text-right font-bold text-muted-foreground"><a href="#" className="hover:underline">Agendar Follow-up</a></TableCell>
-                            </TableRow>
-                        ))}
-                    </TableBody>
-                </Table>
-            </Card>
-        </section>
+    useEffect(() => {
+        const unsubscribe = onSnapshot(prospectsCollectionRef, (snapshot) => {
+            const prospectsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Prospect));
+            setProspects(prospectsData);
+            setIsLoading(false);
+        });
+        return () => unsubscribe();
+    }, [prospectsCollectionRef]);
 
-        <section>
-            <h2 className="text-2xl font-bold tracking-tight mb-4">Calendário de Follow-ups</h2>
-            <div className="grid gap-6 md:grid-cols-1 lg:grid-cols-2">
-                <Card>
-                    <CardContent className="p-0">
-                        <Calendar
-                            mode="single"
-                            selected={date}
-                            onSelect={setDate}
-                            className="w-full"
-                            components={{
-                                IconLeft: ({ ...props }) => <ChevronLeft className="h-4 w-4" />,
-                                IconRight: ({ ...props }) => <ChevronRight className="h-4 w-4" />,
-                            }}
-                         />
-                    </CardContent>
-                </Card>
-                <Card>
-                    <CardContent className="p-0">
-                         <Calendar
-                            mode="single"
-                            selected={date}
-                            onSelect={setDate}
-                            month={new Date(new Date().setMonth(new Date().getMonth() + 1))}
-                            className="w-full"
-                            components={{
-                                IconLeft: ({ ...props }) => <ChevronLeft className="h-4 w-4" />,
-                                IconRight: ({ ...props }) => <ChevronRight className="h-4 w-4" />,
-                            }}
-                         />
-                    </CardContent>
-                </Card>
+    const handleOpenDialog = (prospect: Partial<Prospect> | null) => {
+        setCurrentProspect(prospect);
+        setIsDialogOpen(true);
+    };
+
+    const handleCloseDialog = () => {
+        setCurrentProspect(null);
+        setIsDialogOpen(false);
+    };
+
+    const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+        event.preventDefault();
+        setIsSaving(true);
+        const formData = new FormData(event.currentTarget);
+        const prospectData: Omit<Prospect, 'id' | 'createdAt'> = {
+            name: formData.get('name') as string,
+            contact: formData.get('contact') as string,
+            stage: formData.get('stage') as Prospect['stage'],
+            nextFollowUp: formData.get('nextFollowUp') as string,
+        };
+
+        if (!prospectData.name || !prospectData.contact || !prospectData.stage) {
+            toast({ title: "Campos obrigatórios", description: "Nome, contato e etapa são obrigatórios.", variant: "destructive" });
+            setIsSaving(false);
+            return;
+        }
+
+        try {
+            if (currentProspect && currentProspect.id) {
+                const docRef = doc(db, 'prospects', currentProspect.id);
+                await updateDoc(docRef, prospectData);
+                toast({ title: "Prospect Atualizado!", description: "O prospect foi atualizado com sucesso." });
+            } else {
+                await addDoc(prospectsCollectionRef, { ...prospectData, createdAt: serverTimestamp() });
+                toast({ title: "Prospect Adicionado!", description: "O novo prospect foi criado." });
+            }
+            handleCloseDialog();
+        } catch (error) {
+            console.error("Error saving prospect:", error);
+            toast({ title: "Erro ao salvar", description: "Não foi possível salvar o prospect.", variant: "destructive" });
+        } finally {
+            setIsSaving(false);
+        }
+    };
+    
+    const handleDelete = async (prospectId: string) => {
+        try {
+            await deleteDoc(doc(db, 'prospects', prospectId));
+            toast({ title: "Prospect Removido!", description: "O prospect foi removido com sucesso." });
+        } catch (error) {
+            toast({ title: "Erro ao remover", description: "Não foi possível remover o prospect.", variant: "destructive" });
+        }
+    };
+
+    return (
+        <div className="space-y-6">
+            <div className="flex flex-wrap justify-between items-center gap-4">
+                <h1 className="text-3xl font-bold tracking-tight">Gerenciar Prospecção</h1>
+                <Button onClick={() => handleOpenDialog(null)}>
+                    <PlusCircle className="mr-2 h-4 w-4" />
+                    Adicionar Prospect
+                </Button>
             </div>
-        </section>
-    </div>
-  );
+
+            <section>
+                <Card>
+                    {isLoading ? (
+                        <div className="flex justify-center items-center h-64">
+                            <Loader2 className="h-8 w-8 animate-spin" />
+                        </div>
+                    ) : (
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>Prospect</TableHead>
+                                    <TableHead>Contato</TableHead>
+                                    <TableHead>Etapa</TableHead>
+                                    <TableHead>Próximo Follow-up</TableHead>
+                                    <TableHead className="text-right">Ações</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {prospects.length > 0 ? prospects.map((prospect) => (
+                                    <TableRow key={prospect.id}>
+                                        <TableCell className="font-medium">{prospect.name}</TableCell>
+                                        <TableCell className="text-muted-foreground">{prospect.contact}</TableCell>
+                                        <TableCell>
+                                            <span className="px-2 py-1 text-xs font-semibold rounded-full bg-secondary text-secondary-foreground">
+                                                {prospect.stage}
+                                            </span>
+                                        </TableCell>
+                                        <TableCell className="text-muted-foreground">{prospect.nextFollowUp ? new Date(prospect.nextFollowUp).toLocaleDateString() : 'N/A'}</TableCell>
+                                        <TableCell className="text-right">
+                                            <DropdownMenu>
+                                                <DropdownMenuTrigger asChild>
+                                                    <Button variant="ghost" size="icon" className="h-8 w-8">
+                                                        <MoreVertical className="h-4 w-4" />
+                                                    </Button>
+                                                </DropdownMenuTrigger>
+                                                <DropdownMenuContent>
+                                                    <DropdownMenuItem onClick={() => handleOpenDialog(prospect)}>
+                                                        <Edit className="mr-2 h-4 w-4" /> Editar
+                                                    </DropdownMenuItem>
+                                                    <AlertDialog>
+                                                        <AlertDialogTrigger asChild>
+                                                          <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-destructive focus:bg-destructive/10 focus:text-destructive">
+                                                              <Trash2 className="mr-2 h-4 w-4" /> Excluir
+                                                          </DropdownMenuItem>
+                                                        </AlertDialogTrigger>
+                                                        <AlertDialogContent>
+                                                            <AlertDialogHeader><AlertDialogTitle>Tem certeza?</AlertDialogTitle></AlertDialogHeader>
+                                                            <AlertDialogDescription>Esta ação não pode ser desfeita e removerá o prospect permanentemente.</AlertDialogDescription>
+                                                            <AlertDialogFooter>
+                                                                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                                                <AlertDialogAction onClick={() => handleDelete(prospect.id)}>Excluir</AlertDialogAction>
+                                                            </AlertDialogFooter>
+                                                        </AlertDialogContent>
+                                                    </AlertDialog>
+                                                </DropdownMenuContent>
+                                            </DropdownMenu>
+                                        </TableCell>
+                                    </TableRow>
+                                )) : (
+                                    <TableRow>
+                                        <TableCell colSpan={5} className="h-24 text-center">
+                                            Nenhum prospect cadastrado.
+                                        </TableCell>
+                                    </TableRow>
+                                )}
+                            </TableBody>
+                        </Table>
+                    )}
+                </Card>
+            </section>
+            
+            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>{currentProspect?.id ? 'Editar Prospect' : 'Adicionar Novo Prospect'}</DialogTitle>
+                        <DialogDescription>
+                            Preencha as informações abaixo para gerenciar o prospect.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <form onSubmit={handleSubmit} className="space-y-4">
+                        <div>
+                            <Label htmlFor="name">Nome do Prospect</Label>
+                            <Input id="name" name="name" defaultValue={currentProspect?.name} required />
+                        </div>
+                        <div>
+                            <Label htmlFor="contact">Nome do Contato</Label>
+                            <Input id="contact" name="contact" defaultValue={currentProspect?.contact} required />
+                        </div>
+                         <div>
+                            <Label htmlFor="stage">Etapa do Funil</Label>
+                            <Select name="stage" defaultValue={currentProspect?.stage}>
+                                <SelectTrigger id="stage">
+                                    <SelectValue placeholder="Selecione a etapa" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="Contato Inicial">Contato Inicial</SelectItem>
+                                    <SelectItem value="Qualificado">Qualificado</SelectItem>
+                                    <SelectItem value="Proposta Enviada">Proposta Enviada</SelectItem>
+                                    <SelectItem value="Follow-up">Follow-up</SelectItem>
+                                    <SelectItem value="Negociação">Negociação</SelectItem>
+                                    <SelectItem value="Fechado">Fechado</SelectItem>
+                                    <SelectItem value="Perdido">Perdido</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <div>
+                            <Label htmlFor="nextFollowUp">Próximo Follow-up</Label>
+                            <Input id="nextFollowUp" name="nextFollowUp" type="date" defaultValue={currentProspect?.nextFollowUp} />
+                        </div>
+                        <DialogFooter>
+                            <Button type="button" variant="outline" onClick={handleCloseDialog}>Cancelar</Button>
+                            <Button type="submit" disabled={isSaving}>
+                                {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                                Salvar
+                            </Button>
+                        </DialogFooter>
+                    </form>
+                </DialogContent>
+            </Dialog>
+        </div>
+    );
 }
