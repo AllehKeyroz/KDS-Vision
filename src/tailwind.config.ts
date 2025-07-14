@@ -10,8 +10,8 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        sans: ['"PT Sans"', 'sans-serif'],
-        body: ['"PT Sans"', 'sans-serif'],
+        sans: ['"Inter"', 'sans-serif'],
+        body: ['"Inter"', 'sans-serif'],
         headline: ['"Poppins"', 'sans-serif'],
         code: ['monospace'],
       },
@@ -89,10 +89,19 @@ export default {
             height: '0',
           },
         },
+        aurora: {
+          from: {
+            backgroundPosition: '50% 50%, 50% 50%',
+          },
+          to: {
+            backgroundPosition: '350% 50%, 350% 50%',
+          },
+        },
       },
       animation: {
         'accordion-down': 'accordion-down 0.2s ease-out',
         'accordion-up': 'accordion-up 0.2s ease-out',
+        aurora: 'aurora 20s linear infinite',
       },
     },
   },

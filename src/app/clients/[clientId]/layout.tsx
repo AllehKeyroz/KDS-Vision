@@ -36,20 +36,23 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:gap-4">
         <div className="mt-2 sm:mt-0">
-          <h1 className="text-3xl font-bold tracking-tight">Detalhes do Cliente - {client.name}</h1>
+          <h1 className="text-3xl font-bold tracking-tight font-headline animate-in fade-in-25 slide-in-from-bottom-4 duration-500">{client.name}</h1>
         </div>
       </div>
       
-      <div className="border-b">
-        <div className="flex gap-8 px-4">
-          {tabs.map((tab) => {
+      <div className="border-b border-white/10 animate-in fade-in-25 slide-in-from-bottom-4 duration-500 delay-100">
+        <div className="flex gap-2 sm:gap-8 px-0 sm:px-4 overflow-x-auto">
+          {tabs.map((tab, index) => {
             const isActive = tab.href === currentPathSegment || (tab.href === '/context' && currentPathSegment === '');
             return (
               <Link href={`${basePath}${tab.href === '/context' ? '' : tab.href}`} key={tab.name} passHref>
-                <div className={cn(
-                  "flex flex-col items-center justify-center pb-3 pt-4 text-sm font-bold tracking-wide",
-                  isActive ? "border-b-[3px] border-foreground text-foreground" : "border-b-[3px] border-transparent text-muted-foreground"
-                )}>
+                <div 
+                  className={cn(
+                    "flex flex-col items-center justify-center pb-3 pt-4 text-sm font-bold tracking-wide border-b-[3px] transition-all duration-300 ease-in-out whitespace-nowrap px-4",
+                    isActive ? "border-primary text-primary glow-primary" : "border-transparent text-muted-foreground hover:text-foreground hover:border-primary/50"
+                  )}
+                  style={{ animationDelay: `${150 + index * 50}ms` }}
+                >
                   {tab.name}
                 </div>
               </Link>
@@ -58,7 +61,7 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
         </div>
       </div>
 
-      <div className="mt-6 px-4">
+      <div className="mt-6 px-0 sm:px-4">
         {children}
       </div>
     </div>
