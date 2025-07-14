@@ -1,3 +1,5 @@
+import type { AdsIACreatorInput, AdsIACreatorOutput } from "./ai/flows/ads-ia-creator";
+
 export type Prospect = {
   id: string;
   name: string;
@@ -59,3 +61,14 @@ export interface Project {
   progress: number;
   status: 'Planejamento' | 'Em Andamento' | 'Pausado' | 'Concluído';
 }
+
+export interface AdsCampaign {
+  id: string;
+  title: string;
+  request: AdsIACreatorInput;
+  response: AdsIACreatorOutput;
+  createdAt: any; // Firestore Timestamp
+}
+
+// Re-exporting AI types to be used in the UI
+export type { AdsIACreatorInput, AdsIACreatorOutput };

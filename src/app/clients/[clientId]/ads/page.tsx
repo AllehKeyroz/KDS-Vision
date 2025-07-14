@@ -1,8 +1,8 @@
 'use client'
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useParams } from 'next/navigation';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -10,11 +10,13 @@ import { Button } from '@/components/ui/button';
 import { runAdsCreator } from '@/app/actions';
 import { CLIENT_CONTEXT_DATA } from '@/lib/data';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Wand2, Newspaper, Target, Milestone, Wallet, Lightbulb, Bot, Image as ImageIcon } from 'lucide-react';
-import type { AdsIACreatorOutput } from '@/ai/flows/ads-ia-creator';
+import { Loader2, Wand2, Newspaper, Target, Milestone, Wallet, Lightbulb, Bot, Image as ImageIcon, Save, Trash2, GalleryVerticalEnd } from 'lucide-react';
+import type { AdsCampaign, AdsIACreatorOutput } from '@/lib/types';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
+import { collection, addDoc, onSnapshot, serverTimestamp, doc, deleteDoc } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
 
 export default function AdsCreatorPage() {
     const params = useParams();
@@ -22,15 +24,32 @@ export default function AdsCreatorPage() {
     const { toast } = useToast();
     
     const [formData, setFormData] = useState({
-        advertisingGoal: '',
         productOrService: '',
-        targetAudience: '',
+        advertisingGoal: '',
+        platforms: '',
+        campaignType: '',
+        audiences: '',
+        interests: '',
+        negativeKeywords: '',
         numCampaigns: 1,
         numAdSets: 1,
         numCreatives: 1,
     });
-    const [result, setResult] = useState<AdsIACreatorOutput | null>(null);
+    const [generatedResult, setGeneratedResult] = useState<AdsIACreatorOutput | null>(null);
     const [isLoading, setIsLoading] = useState(false);
+    const [savedCampaigns, setSavedCampaigns] = useState<AdsCampaign[]>([]);
+    const [isCampaignsLoading, setIsCampaignsLoading] = useState(true);
+
+    const campaignsCollectionRef = useMemo(() => collection(db, 'clients', clientId, 'ad_campaigns'), [clientId]);
+
+    useEffect(() => {
+        const unsubscribe = onSnapshot(campaignsCollectionRef, (snapshot) => {
+            const campaignsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as AdsCampaign));
+            setSavedCampaigns(campaignsData);
+            setIsCampaignsLoading(false);
+        });
+        return () => unsubscribe();
+    }, [campaignsCollectionRef]);
     
     const clientContextData = CLIENT_CONTEXT_DATA[clientId] || {};
     const clientContext = Object.entries(clientContextData)
@@ -45,30 +64,23 @@ export default function AdsCreatorPage() {
         });
     };
 
-    const handleSubmit = async (e: React.FormEvent) => {
+    const handleGenerate = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!formData.advertisingGoal || !formData.productOrService || !formData.targetAudience) {
+        // Basic validation
+        if (!formData.productOrService || !formData.advertisingGoal || !formData.platforms || !formData.campaignType || !formData.audiences || !formData.interests) {
             toast({
                 title: 'Campos obrigatórios',
-                description: 'Todos os campos são necessários para criar a campanha.',
+                description: 'Preencha todos os campos do gestor de tráfego.',
                 variant: 'destructive',
             });
             return;
         }
         setIsLoading(true);
-        setResult(null);
+        setGeneratedResult(null);
 
         try {
-            const response = await runAdsCreator({ 
-                clientContext, 
-                advertisingGoal: formData.advertisingGoal,
-                productOrService: formData.productOrService,
-                targetAudience: formData.targetAudience,
-                numCampaigns: formData.numCampaigns,
-                numAdSets: formData.numAdSets,
-                numCreatives: formData.numCreatives,
-             });
-            setResult(response);
+            const response = await runAdsCreator({ clientContext, ...formData });
+            setGeneratedResult(response);
         } catch (error) {
             toast({
                 title: 'Erro ao Criar Campanha',
@@ -81,138 +93,223 @@ export default function AdsCreatorPage() {
         }
     };
 
+    const handleSaveCampaign = async () => {
+        if (!generatedResult) return;
+        try {
+            await addDoc(campaignsCollectionRef, {
+                title: formData.productOrService || 'Campanha Salva',
+                request: formData,
+                response: generatedResult,
+                createdAt: serverTimestamp(),
+            });
+            toast({ title: "Campanha Salva!", description: "A estrutura da campanha foi salva na galeria." });
+            setGeneratedResult(null); // Clear the generated result after saving
+        } catch (error) {
+            toast({ title: "Erro ao Salvar", description: "Não foi possível salvar a campanha.", variant: 'destructive' });
+        }
+    };
+    
+    const handleDeleteCampaign = async (campaignId: string) => {
+        try {
+            await deleteDoc(doc(db, 'clients', clientId, 'ad_campaigns', campaignId));
+            toast({ title: "Campanha Excluída", description: "A campanha foi removida da galeria." });
+        } catch (error) {
+            toast({ title: "Erro ao Excluir", variant: "destructive" });
+        }
+    };
+
     return (
-        <div className="grid gap-6 lg:grid-cols-3 lg:items-start">
-            <div className="lg:col-span-1 lg:sticky lg:top-6 space-y-6">
+        <div className="space-y-6">
+            <Card>
+                <CardHeader>
+                    <CardTitle className="font-headline">Ads IA Creator</CardTitle>
+                    <CardDescription>
+                        Preencha os detalhes como um gestor de tráfego e crie uma campanha completa com a ajuda da IA.
+                    </CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <form onSubmit={handleGenerate} className="space-y-6">
+                        {/* Traffic Manager Inputs */}
+                        <div className="space-y-4 p-4 border rounded-lg">
+                           <h3 className="font-semibold text-lg">Briefing do Gestor de Tráfego</h3>
+                           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                               <div className="space-y-2">
+                                   <Label htmlFor="productOrService">Produto/Serviço a Anunciar</Label>
+                                   <Input id="productOrService" value={formData.productOrService} onChange={handleChange} placeholder="Ex: Novo tênis de corrida 'Speedster'" />
+                               </div>
+                               <div className="space-y-2">
+                                   <Label htmlFor="advertisingGoal">Objetivo da Publicidade</Label>
+                                   <Input id="advertisingGoal" value={formData.advertisingGoal} onChange={handleChange} placeholder="Ex: Vender o novo tênis" />
+                               </div>
+                               <div className="space-y-2">
+                                   <Label htmlFor="platforms">Plataformas de Anúncio</Label>
+                                   <Input id="platforms" value={formData.platforms} onChange={handleChange} placeholder="Ex: Google Ads, Meta Ads (Facebook/Instagram)" />
+                               </div>
+                               <div className="space-y-2">
+                                   <Label htmlFor="campaignType">Tipo de Campanha</Label>
+                                   <Input id="campaignType" value={formData.campaignType} onChange={handleChange} placeholder="Ex: Vendas, Leads, Reconhecimento de Marca" />
+                               </div>
+                           </div>
+                           <div className="space-y-2">
+                               <Label htmlFor="audiences">Públicos-alvo</Label>
+                               <Textarea id="audiences" value={formData.audiences} onChange={handleChange} placeholder="Descreva os públicos (frio, morno, quente), dados demográficos..." rows={3} />
+                           </div>
+                           <div className="space-y-2">
+                               <Label htmlFor="interests">Interesses, Palavras-chave, Comportamentos</Label>
+                               <Textarea id="interests" value={formData.interests} onChange={handleChange} placeholder="Liste os interesses para Meta Ads, palavras-chave para Google Ads, etc." rows={3} />
+                           </div>
+                           <div className="space-y-2">
+                               <Label htmlFor="negativeKeywords">Negativação (Opcional)</Label>
+                               <Textarea id="negativeKeywords" value={formData.negativeKeywords} onChange={handleChange} placeholder="Liste palavras-chave ou públicos a serem excluídos." rows={2} />
+                           </div>
+                        </div>
+
+                        {/* Structure Definition */}
+                        <div className="space-y-4 p-4 border rounded-lg">
+                             <h3 className="font-semibold text-lg">Estrutura da Campanha</h3>
+                             <CardDescription>Defina quantas variações a IA deve gerar.</CardDescription>
+                             <div className="grid grid-cols-3 gap-4">
+                                <div className="space-y-2">
+                                     <Label htmlFor="numCampaigns">Campanhas</Label>
+                                     <Input id="numCampaigns" type="number" value={formData.numCampaigns} onChange={handleChange} min="1" max="5"/>
+                                 </div>
+                                 <div className="space-y-2">
+                                     <Label htmlFor="numAdSets">Conjuntos / Campanha</Label>
+                                     <Input id="numAdSets" type="number" value={formData.numAdSets} onChange={handleChange} min="1" max="5"/>
+                                 </div>
+                                  <div className="space-y-2">
+                                     <Label htmlFor="numCreatives">Criativos / Conjunto</Label>
+                                     <Input id="numCreatives" type="number" value={formData.numCreatives} onChange={handleChange} min="1" max="5"/>
+                                 </div>
+                             </div>
+                        </div>
+                        <Button type="submit" disabled={isLoading} className="w-full">
+                            {isLoading ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Gerando Campanha...</> : <><Wand2 className="w-4 h-4 mr-2" /> Gerar Estrutura de Campanha</>}
+                        </Button>
+                    </form>
+                </CardContent>
+            </Card>
+
+            {(generatedResult && !isLoading) && (
                 <Card>
-                    <CardHeader>
-                        <CardTitle className="font-headline">Ads IA Creator</CardTitle>
-                        <CardDescription>
-                            Crie uma campanha de anúncios completa com a ajuda da IA.
-                        </CardDescription>
+                    <CardHeader className="flex flex-row justify-between items-start">
+                        <div>
+                             <CardTitle className="font-headline">Resultado Gerado</CardTitle>
+                             <CardDescription>Revise a estrutura abaixo e salve na sua galeria.</CardDescription>
+                        </div>
+                        <Button onClick={handleSaveCampaign}><Save className="w-4 h-4 mr-2" /> Salvar Campanha</Button>
                     </CardHeader>
                     <CardContent>
-                        <form onSubmit={handleSubmit} className="space-y-4">
-                            <div className="space-y-2">
-                                <Label htmlFor="productOrService">Produto/Serviço a Anunciar</Label>
-                                <Input id="productOrService" value={formData.productOrService} onChange={handleChange} placeholder="Ex: Novo tênis de corrida 'Speedster'" />
-                            </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="advertisingGoal">Objetivo da Publicidade</Label>
-                                <Input id="advertisingGoal" value={formData.advertisingGoal} onChange={handleChange} placeholder="Ex: Vender o novo tênis" />
-                            </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="targetAudience">Público-alvo Detalhado</Label>
-                                <Textarea id="targetAudience" value={formData.targetAudience} onChange={handleChange} placeholder="Ex: Corredores amadores, 25-40 anos, interessados em maratonas" rows={3} />
-                            </div>
-                            <Separator/>
-                            <CardDescription>Defina a estrutura da campanha</CardDescription>
-                            <div className="grid grid-cols-3 gap-2">
-                               <div className="space-y-2">
-                                    <Label htmlFor="numCampaigns">Campanhas</Label>
-                                    <Input id="numCampaigns" type="number" value={formData.numCampaigns} onChange={handleChange} min="1" max="5"/>
-                                </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="numAdSets">Conjuntos</Label>
-                                    <Input id="numAdSets" type="number" value={formData.numAdSets} onChange={handleChange} min="1" max="5"/>
-                                </div>
-                                 <div className="space-y-2">
-                                    <Label htmlFor="numCreatives">Criativos</Label>
-                                    <Input id="numCreatives" type="number" value={formData.numCreatives} onChange={handleChange} min="1" max="5"/>
-                                </div>
-                            </div>
-                            <Button type="submit" disabled={isLoading} className="w-full">
-                                {isLoading ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Gerando Campanha...</> : <><Wand2 className="w-4 h-4 mr-2" /> Gerar Estrutura de Campanha</>}
-                            </Button>
-                        </form>
+                        <GeneratedCampaignContent result={generatedResult} />
                     </CardContent>
                 </Card>
-                 {result && (
-                    <Card className="animate-in fade-in-50">
+            )}
+
+            <div className="space-y-4">
+                <h2 className="text-2xl font-bold font-headline flex items-center gap-2"><GalleryVerticalEnd /> Galeria de Campanhas</h2>
+                {isCampaignsLoading ? <Loader2 className="animate-spin" /> :
+                 savedCampaigns.length === 0 ? <p className="text-muted-foreground">Nenhuma campanha salva ainda.</p> :
+                 <Accordion type="multiple" className="w-full space-y-4">
+                     {savedCampaigns.map(campaign => (
+                         <Card key={campaign.id}>
+                           <CardHeader className="flex flex-row justify-between items-start">
+                                <div>
+                                    <CardTitle className="font-headline text-xl">{campaign.title}</CardTitle>
+                                    <CardDescription>Criado em: {new Date(campaign.createdAt?.toDate()).toLocaleDateString()}</CardDescription>
+                                </div>
+                                <Button variant="ghost" size="icon" onClick={() => handleDeleteCampaign(campaign.id)}>
+                                    <Trash2 className="h-4 w-4 text-destructive" />
+                                </Button>
+                            </CardHeader>
+                             <CardContent>
+                                 <GeneratedCampaignContent result={campaign.response} />
+                             </CardContent>
+                         </Card>
+                     ))}
+                 </Accordion>
+                }
+            </div>
+        </div>
+    );
+}
+
+
+function GeneratedCampaignContent({ result }: { result: AdsIACreatorOutput }) {
+    return (
+        <div className="space-y-6">
+             <Card className="animate-in fade-in-50 bg-secondary/30">
+                <CardHeader>
+                    <CardTitle className="font-headline flex items-center gap-2"><Bot /> Resumo Estratégico da IA</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                     <div className="flex flex-wrap gap-2">
+                        <Badge variant="secondary" className="flex items-center gap-2"><Wallet className="w-4 h-4"/> Orçamento Sugerido: R$ {result.overallBudget.suggestion.toFixed(2)}</Badge>
+                        <Badge variant="secondary" className="flex items-center gap-2"><Lightbulb className="w-4 h-4"/> Alocação: {result.overallBudget.allocation}</Badge>
+                    </div>
+                    <p className="text-sm text-muted-foreground">{result.summary}</p>
+                </CardContent>
+            </Card>
+
+            <Accordion type="multiple" className="w-full space-y-4">
+                {result.campaigns.map((campaign, campIndex) => (
+                     <Card key={campIndex} className="animate-in fade-in-50">
                         <CardHeader>
-                            <CardTitle className="font-headline flex items-center gap-2"><Bot /> Resumo Estratégico da IA</CardTitle>
+                             <CardTitle className="font-headline flex items-center gap-2 text-xl"><Milestone /> Campanha: {campaign.campaignName}</CardTitle>
                         </CardHeader>
-                        <CardContent className="space-y-4">
-                             <div className="flex flex-wrap gap-2">
-                                <Badge variant="secondary" className="flex items-center gap-2"><Wallet className="w-4 h-4"/> Orçamento Sugerido: R$ {result.overallBudget.suggestion.toFixed(2)}</Badge>
-                                <Badge variant="secondary" className="flex items-center gap-2"><Lightbulb className="w-4 h-4"/> Alocação: {result.overallBudget.allocation}</Badge>
-                            </div>
-                            <p className="text-sm text-muted-foreground">{result.summary}</p>
+                        <CardContent>
+                            <Accordion type="multiple" className="w-full">
+                                {campaign.adSets.map((adSet, adSetIndex) => (
+                                    <AccordionItem value={`adset-${campIndex}-${adSetIndex}`} key={adSetIndex}>
+                                        <AccordionTrigger className="font-semibold text-base font-headline">
+                                            <div className="flex items-center gap-2"><Target className="w-5 h-5 text-primary"/>Conjunto: {adSet.adSetName}</div>
+                                        </AccordionTrigger>
+                                        <AccordionContent className="pl-6 space-y-4">
+                                            <p><span className="font-semibold">Direcionamento:</span> {adSet.targeting}</p>
+                                            <p><span className="font-semibold">Orçamento do Conjunto:</span> R$ {adSet.budget.toFixed(2)}</p>
+                                            <h4 className="font-semibold text-md mt-4">Criativos:</h4>
+                                            <Accordion type="multiple" className="w-full space-y-2">
+                                                {adSet.creatives.map((creative, cIndex) => (
+                                                    <AccordionItem value={`creative-${campIndex}-${adSetIndex}-${cIndex}`} key={cIndex} className="border p-3 rounded-lg bg-secondary/30">
+                                                        <AccordionTrigger className="text-sm font-semibold p-2">
+                                                            <div className="flex items-center gap-2"><Newspaper className="w-4 h-4" />{creative.creativeName}</div>
+                                                        </AccordionTrigger>
+                                                        <AccordionContent className="pt-4 px-2 space-y-3 text-xs">
+                                                            <div>
+                                                                <h6 className="font-bold">Títulos:</h6>
+                                                                <ul className="list-disc pl-5">
+                                                                    {creative.titles.map((t, i) => <li key={i}>{t}</li>)}
+                                                                </ul>
+                                                            </div>
+                                                             <div>
+                                                                <h6 className="font-bold">Descrições:</h6>
+                                                                <ul className="list-disc pl-5">
+                                                                    {creative.descriptions.map((d, i) => <li key={i}>{d}</li>)}
+                                                                </ul>
+                                                            </div>
+                                                             <div>
+                                                                <h6 className="font-bold">CTAs:</h6>
+                                                                <ul className="list-disc pl-5">
+                                                                    {creative.ctas.map((c, i) => <li key={i}>{c}</li>)}
+                                                                </ul>
+                                                            </div>
+                                                            <div>
+                                                                <h6 className="font-bold flex items-center gap-1"><ImageIcon className="w-4 h-4" /> Ideias de Imagem/Vídeo:</h6>
+                                                                <ul className="list-disc pl-5">
+                                                                    {creative.imageIdeas.map((idea, i) => <li key={i}>{idea}</li>)}
+                                                                </ul>
+                                                            </div>
+                                                        </AccordionContent>
+                                                    </AccordionItem>
+                                                ))}
+                                            </Accordion>
+                                        </AccordionContent>
+                                    </AccordionItem>
+                                ))}
+                            </Accordion>
                         </CardContent>
                     </Card>
-                )}
-            </div>
-
-            <div className="lg:col-span-2 space-y-6">
-                {isLoading && (
-                    <Card className="flex flex-col items-center justify-center h-96">
-                        <Loader2 className="w-12 h-12 text-primary animate-spin" />
-                        <p className="mt-4 text-lg text-muted-foreground">A IA está montando sua campanha...</p>
-                    </Card>
-                )}
-                {result && (
-                    <Accordion type="multiple" className="w-full space-y-4">
-                        {result.campaigns.map((campaign, campIndex) => (
-                             <Card key={campIndex} className="animate-in fade-in-50">
-                                <CardHeader>
-                                     <CardTitle className="font-headline flex items-center gap-2 text-xl"><Milestone /> Campanha: {campaign.campaignName}</CardTitle>
-                                </CardHeader>
-                                <CardContent>
-                                    <Accordion type="multiple" className="w-full">
-                                        {campaign.adSets.map((adSet, adSetIndex) => (
-                                            <AccordionItem value={`adset-${campIndex}-${adSetIndex}`} key={adSetIndex}>
-                                                <AccordionTrigger className="font-semibold text-base font-headline">
-                                                    <div className="flex items-center gap-2"><Target className="w-5 h-5 text-primary"/>Conjunto: {adSet.adSetName}</div>
-                                                </AccordionTrigger>
-                                                <AccordionContent className="pl-6 space-y-4">
-                                                    <p><span className="font-semibold">Direcionamento:</span> {adSet.targeting}</p>
-                                                    <p><span className="font-semibold">Orçamento do Conjunto:</span> R$ {adSet.budget.toFixed(2)}</p>
-                                                    <h4 className="font-semibold text-md mt-4">Criativos:</h4>
-                                                    <Accordion type="multiple" className="w-full space-y-2">
-                                                        {adSet.creatives.map((creative, cIndex) => (
-                                                            <AccordionItem value={`creative-${campIndex}-${adSetIndex}-${cIndex}`} key={cIndex} className="border p-3 rounded-lg bg-secondary/30">
-                                                                <AccordionTrigger className="text-sm font-semibold p-2">
-                                                                    <div className="flex items-center gap-2"><Newspaper className="w-4 h-4" />{creative.creativeName}</div>
-                                                                </AccordionTrigger>
-                                                                <AccordionContent className="pt-4 px-2 space-y-3 text-xs">
-                                                                    <div>
-                                                                        <h6 className="font-bold">Títulos:</h6>
-                                                                        <ul className="list-disc pl-5">
-                                                                            {creative.titles.map((t, i) => <li key={i}>{t}</li>)}
-                                                                        </ul>
-                                                                    </div>
-                                                                     <div>
-                                                                        <h6 className="font-bold">Descrições:</h6>
-                                                                        <ul className="list-disc pl-5">
-                                                                            {creative.descriptions.map((d, i) => <li key={i}>{d}</li>)}
-                                                                        </ul>
-                                                                    </div>
-                                                                     <div>
-                                                                        <h6 className="font-bold">CTAs:</h6>
-                                                                        <ul className="list-disc pl-5">
-                                                                            {creative.ctas.map((c, i) => <li key={i}>{c}</li>)}
-                                                                        </ul>
-                                                                    </div>
-                                                                    <div>
-                                                                        <h6 className="font-bold flex items-center gap-1"><ImageIcon className="w-4 h-4" /> Ideias de Imagem/Vídeo:</h6>
-                                                                        <ul className="list-disc pl-5">
-                                                                            {creative.imageIdeas.map((idea, i) => <li key={i}>{idea}</li>)}
-                                                                        </ul>
-                                                                    </div>
-                                                                </AccordionContent>
-                                                            </AccordionItem>
-                                                        ))}
-                                                    </Accordion>
-                                                </AccordionContent>
-                                            </AccordionItem>
-                                        ))}
-                                    </Accordion>
-                                </CardContent>
-                            </Card>
-                        ))}
-                    </Accordion>
-                )}
-            </div>
+                ))}
+            </Accordion>
         </div>
     );
 }

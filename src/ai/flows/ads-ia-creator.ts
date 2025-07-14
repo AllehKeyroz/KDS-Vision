@@ -15,19 +15,21 @@ import {z} from 'genkit';
 const AdsIACreatorInputSchema = z.object({
   clientContext: z
     .string()
-    .describe('The context of the client, including ICP, CAC, FAQ, and any other relevant information.'),
+    .describe('O contexto do cliente, incluindo ICP, CAC, FAQ, e qualquer outra informação relevante.'),
   advertisingGoal: z
     .string()
-    .describe('The advertising goal, such as increasing brand awareness, generating leads, or driving sales.'),
+    .describe('O objetivo da publicidade, como aumentar brand awareness, gerar leads, ou driving sales.'),
   productOrService: z
     .string()
-    .describe('The product or service being advertised.'),
-  targetAudience: z
-    .string()
-    .describe('A description of the target audience for the ad campaign.'),
-  numCampaigns: z.number().describe('The number of campaigns to generate.'),
-  numAdSets: z.number().describe('The number of ad sets to generate per campaign.'),
-  numCreatives: z.number().describe('The number of creatives to generate per ad set.'),
+    .describe('O produto ou serviço sendo anunciado.'),
+  platforms: z.string().describe('As plataformas onde os anúncios serão veiculados (ex: Google Ads, Meta Ads).'),
+  campaignType: z.string().describe('O tipo de campanha (ex: Vendas, Leads, Tráfego no site).'),
+  audiences: z.string().describe('Descrição dos públicos-alvo principais.'),
+  interests: z.string().describe('Interesses, palavras-chave e comportamentos para segmentação.'),
+  negativeKeywords: z.string().optional().describe('Palavras-chave ou públicos a serem negativados/excluídos.'),
+  numCampaigns: z.number().describe('O número de campanhas para gerar.'),
+  numAdSets: z.number().describe('O número de ad sets para gerar por campanha.'),
+  numCreatives: z.number().describe('O número de criativos para gerar por ad set.'),
 });
 export type AdsIACreatorInput = z.infer<typeof AdsIACreatorInputSchema>;
 
@@ -70,21 +72,21 @@ const prompt = ai.definePrompt({
   name: 'adsIACreatorPrompt',
   input: {schema: AdsIACreatorInputSchema},
   output: {schema: AdsIACreatorOutputSchema},
-  prompt: `Você é um especialista em marketing e tráfego pago. Sua tarefa é criar uma estratégia de anúncios completa e robusta para um cliente da agência Keyroz Digital Solutions. Responda inteiramente em português do Brasil.
+  prompt: `Você é um gestor de tráfego sênior e especialista em marketing digital na agência Keyroz Digital Solutions. Sua tarefa é criar uma estratégia de anúncios completa e robusta, respondendo inteiramente em português do Brasil.
 
 **Contexto do Cliente:**
 {{{clientContext}}}
 
-**Objetivo da Publicidade:**
-{{{advertisingGoal}}}
+**Detalhes da Campanha:**
+- **Produto/Serviço a ser Anunciado:** {{{productOrService}}}
+- **Objetivo Principal:** {{{advertisingGoal}}}
+- **Plataformas:** {{{platforms}}}
+- **Tipo de Campanha:** {{{campaignType}}}
+- **Públicos-alvo:** {{{audiences}}}
+- **Interesses/Palavras-chave:** {{{interests}}}
+{{#if negativeKeywords}}- **Públicos/Palavras-chave a Negativar:** {{{negativeKeywords}}}{{/if}}
 
-**Produto/Serviço a ser Anunciado:**
-{{{productOrService}}}
-
-**Público-alvo:**
-{{{targetAudience}}}
-
-Com base nessas informações, gere uma estrutura detalhada de publicidade. Você deve criar **{{{numCampaigns}}} campanhas distintas**, cada uma com um ângulo ou objetivo ligeiramente diferente. Dentro de cada campanha, crie **{{{numAdSets}}} conjuntos de anúncios** com diferentes segmentações de público. Para cada conjunto de anúncios, desenvolva **{{{numCreatives}}} ideias de criativos**.
+Com base nessas informações, gere uma estrutura detalhada de publicidade. Você deve criar **{{{numCampaigns}}} campanhas distintas**. Dentro de cada campanha, crie **{{{numAdSets}}} conjuntos de anúncios** com diferentes segmentações. Para cada conjunto de anúncios, desenvolva **{{{numCreatives}}} ideias de criativos**.
 
 Para cada **criativo**, você deve fornecer:
 - 3 opções de **títulos** persuasivos.
