@@ -2,7 +2,7 @@
 'use client';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Briefcase, LayoutDashboard, Users, Zap, Search, Folder, Megaphone, PresentationChart, Settings } from 'lucide-react';
+import { Briefcase, LayoutDashboard, Users, Search, Folder, Megaphone, Presentation, Settings } from 'lucide-react';
 import {
   SidebarProvider,
   Sidebar,
@@ -86,7 +86,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <SidebarMenuButton
                 tooltip="Relatórios"
               >
-                <PresentationChart />
+                <Presentation />
                 <span>Relatórios</span>
               </SidebarMenuButton>
             </SidebarMenuItem>
