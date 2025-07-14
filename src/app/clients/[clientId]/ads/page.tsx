@@ -1,3 +1,4 @@
+
 'use client'
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -26,11 +27,6 @@ export default function AdsCreatorPage() {
     const [formData, setFormData] = useState({
         productOrService: '',
         advertisingGoal: '',
-        platforms: '',
-        campaignType: '',
-        audiences: '',
-        interests: '',
-        negativeKeywords: '',
         numCampaigns: 1,
         numAdSets: 1,
         numCreatives: 1,
@@ -51,6 +47,7 @@ export default function AdsCreatorPage() {
         return () => unsubscribe();
     }, [campaignsCollectionRef]);
     
+    // In a real app, this context would be fetched from Firestore. For now, we use the mock.
     const clientContextData = CLIENT_CONTEXT_DATA[clientId] || {};
     const clientContext = Object.entries(clientContextData)
         .map(([key, value]) => `${key.toUpperCase()}: ${value}`)
@@ -67,10 +64,10 @@ export default function AdsCreatorPage() {
     const handleGenerate = async (e: React.FormEvent) => {
         e.preventDefault();
         // Basic validation
-        if (!formData.productOrService || !formData.advertisingGoal || !formData.platforms || !formData.campaignType || !formData.audiences || !formData.interests) {
+        if (!formData.productOrService || !formData.advertisingGoal) {
             toast({
                 title: 'Campos obrigatórios',
-                description: 'Preencha todos os campos do gestor de tráfego.',
+                description: 'Preencha o que você quer anunciar e seu objetivo.',
                 variant: 'destructive',
             });
             return;
@@ -124,47 +121,25 @@ export default function AdsCreatorPage() {
                 <CardHeader>
                     <CardTitle className="font-headline">Ads IA Creator</CardTitle>
                     <CardDescription>
-                        Preencha os detalhes como um gestor de tráfego e crie uma campanha completa com a ajuda da IA.
+                        Descreva seu objetivo e deixe a IA montar a melhor estratégia de anúncios para você.
                     </CardDescription>
                 </CardHeader>
                 <CardContent>
                     <form onSubmit={handleGenerate} className="space-y-6">
-                        {/* Traffic Manager Inputs */}
                         <div className="space-y-4 p-4 border rounded-lg">
-                           <h3 className="font-semibold text-lg">Briefing do Gestor de Tráfego</h3>
+                           <h3 className="font-semibold text-lg">Briefing para a IA</h3>
                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                <div className="space-y-2">
-                                   <Label htmlFor="productOrService">Produto/Serviço a Anunciar</Label>
-                                   <Input id="productOrService" value={formData.productOrService} onChange={handleChange} placeholder="Ex: Novo tênis de corrida 'Speedster'" />
+                                   <Label htmlFor="productOrService">O que você quer anunciar?</Label>
+                                   <Input id="productOrService" value={formData.productOrService} onChange={handleChange} placeholder="Ex: Meu curso de marketing digital" />
                                </div>
                                <div className="space-y-2">
-                                   <Label htmlFor="advertisingGoal">Objetivo da Publicidade</Label>
-                                   <Input id="advertisingGoal" value={formData.advertisingGoal} onChange={handleChange} placeholder="Ex: Vender o novo tênis" />
+                                   <Label htmlFor="advertisingGoal">Qual é o seu principal objetivo?</Label>
+                                   <Input id="advertisingGoal" value={formData.advertisingGoal} onChange={handleChange} placeholder="Ex: Vender mais, conseguir mais clientes" />
                                </div>
-                               <div className="space-y-2">
-                                   <Label htmlFor="platforms">Plataformas de Anúncio</Label>
-                                   <Input id="platforms" value={formData.platforms} onChange={handleChange} placeholder="Ex: Google Ads, Meta Ads (Facebook/Instagram)" />
-                               </div>
-                               <div className="space-y-2">
-                                   <Label htmlFor="campaignType">Tipo de Campanha</Label>
-                                   <Input id="campaignType" value={formData.campaignType} onChange={handleChange} placeholder="Ex: Vendas, Leads, Reconhecimento de Marca" />
-                               </div>
-                           </div>
-                           <div className="space-y-2">
-                               <Label htmlFor="audiences">Públicos-alvo</Label>
-                               <Textarea id="audiences" value={formData.audiences} onChange={handleChange} placeholder="Descreva os públicos (frio, morno, quente), dados demográficos..." rows={3} />
-                           </div>
-                           <div className="space-y-2">
-                               <Label htmlFor="interests">Interesses, Palavras-chave, Comportamentos</Label>
-                               <Textarea id="interests" value={formData.interests} onChange={handleChange} placeholder="Liste os interesses para Meta Ads, palavras-chave para Google Ads, etc." rows={3} />
-                           </div>
-                           <div className="space-y-2">
-                               <Label htmlFor="negativeKeywords">Negativação (Opcional)</Label>
-                               <Textarea id="negativeKeywords" value={formData.negativeKeywords} onChange={handleChange} placeholder="Liste palavras-chave ou públicos a serem excluídos." rows={2} />
                            </div>
                         </div>
 
-                        {/* Structure Definition */}
                         <div className="space-y-4 p-4 border rounded-lg">
                              <h3 className="font-semibold text-lg">Estrutura da Campanha</h3>
                              <CardDescription>Defina quantas variações a IA deve gerar.</CardDescription>
@@ -184,7 +159,7 @@ export default function AdsCreatorPage() {
                              </div>
                         </div>
                         <Button type="submit" disabled={isLoading} className="w-full">
-                            {isLoading ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Gerando Campanha...</> : <><Wand2 className="w-4 h-4 mr-2" /> Gerar Estrutura de Campanha</>}
+                            {isLoading ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Gerando Campanha...</> : <><Wand2 className="w-4 h-4 mr-2" /> Gerar Estrutura com IA</>}
                         </Button>
                     </form>
                 </CardContent>
@@ -255,6 +230,7 @@ function GeneratedCampaignContent({ result }: { result: AdsIACreatorOutput }) {
                      <Card key={campIndex} className="animate-in fade-in-50">
                         <CardHeader>
                              <CardTitle className="font-headline flex items-center gap-2 text-xl"><Milestone /> Campanha: {campaign.campaignName}</CardTitle>
+                             <CardDescription>Tipo de Campanha Sugerido: <Badge variant="outline">{campaign.campaignType}</Badge></CardDescription>
                         </CardHeader>
                         <CardContent>
                             <Accordion type="multiple" className="w-full">
@@ -264,6 +240,7 @@ function GeneratedCampaignContent({ result }: { result: AdsIACreatorOutput }) {
                                             <div className="flex items-center gap-2"><Target className="w-5 h-5 text-primary"/>Conjunto: {adSet.adSetName}</div>
                                         </AccordionTrigger>
                                         <AccordionContent className="pl-6 space-y-4">
+                                            <p><span className="font-semibold">Plataformas Recomendadas:</span> {adSet.platforms}</p>
                                             <p><span className="font-semibold">Direcionamento:</span> {adSet.targeting}</p>
                                             <p><span className="font-semibold">Orçamento do Conjunto:</span> R$ {adSet.budget.toFixed(2)}</p>
                                             <h4 className="font-semibold text-md mt-4">Criativos:</h4>
@@ -313,3 +290,4 @@ function GeneratedCampaignContent({ result }: { result: AdsIACreatorOutput }) {
         </div>
     );
 }
+

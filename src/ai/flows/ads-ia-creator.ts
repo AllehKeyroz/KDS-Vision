@@ -16,17 +16,12 @@ const AdsIACreatorInputSchema = z.object({
   clientContext: z
     .string()
     .describe('O contexto do cliente, incluindo ICP, CAC, FAQ, e qualquer outra informação relevante.'),
-  advertisingGoal: z
-    .string()
-    .describe('O objetivo da publicidade, como aumentar brand awareness, gerar leads, ou driving sales.'),
   productOrService: z
     .string()
     .describe('O produto ou serviço sendo anunciado.'),
-  platforms: z.string().describe('As plataformas onde os anúncios serão veiculados (ex: Google Ads, Meta Ads).'),
-  campaignType: z.string().describe('O tipo de campanha (ex: Vendas, Leads, Tráfego no site).'),
-  audiences: z.string().describe('Descrição dos públicos-alvo principais.'),
-  interests: z.string().describe('Interesses, palavras-chave e comportamentos para segmentação.'),
-  negativeKeywords: z.string().optional().describe('Palavras-chave ou públicos a serem negativados/excluídos.'),
+  advertisingGoal: z
+    .string()
+    .describe('O objetivo da publicidade, como "aumentar vendas", "gerar leads", ou "divulgar a marca".'),
   numCampaigns: z.number().describe('O número de campanhas para gerar.'),
   numAdSets: z.number().describe('O número de ad sets para gerar por campanha.'),
   numCreatives: z.number().describe('O número de criativos para gerar por ad set.'),
@@ -44,13 +39,15 @@ const CreativeSchema = z.object({
 
 const AdSetSchema = z.object({
     adSetName: z.string().describe('O nome do conjunto de anúncios (Ex: "Público Frio - Interesses").'),
-    targeting: z.string().describe('Os critérios de direcionamento para este conjunto (público, idade, interesses).'),
+    platforms: z.string().describe('As plataformas recomendadas para este conjunto (Ex: "Google Ads (Pesquisa)", "Meta Ads (Instagram, Facebook)").'),
+    targeting: z.string().describe('A estratégia de direcionamento detalhada para este conjunto (públicos, idade, interesses, palavras-chave, etc.).'),
     budget: z.number().describe('O orçamento diário ou vitalício sugerido para este conjunto.'),
     creatives: z.array(CreativeSchema).describe('Uma lista de criativos para este conjunto de anúncios.')
 });
 
 const CampaignSchema = z.object({
     campaignName: z.string().describe('O nome da campanha (Ex: "Lançamento Produto X - Vendas").'),
+    campaignType: z.string().describe('O tipo/objetivo da campanha recomendado (Ex: "Vendas", "Leads", "Tráfego no site").'),
     adSets: z.array(AdSetSchema).describe('Uma lista de conjuntos de anúncios para esta campanha.')
 });
 
@@ -72,21 +69,23 @@ const prompt = ai.definePrompt({
   name: 'adsIACreatorPrompt',
   input: {schema: AdsIACreatorInputSchema},
   output: {schema: AdsIACreatorOutputSchema},
-  prompt: `Você é um gestor de tráfego sênior e especialista em marketing digital na agência Keyroz Digital Solutions. Sua tarefa é criar uma estratégia de anúncios completa e robusta, respondendo inteiramente em português do Brasil.
+  prompt: `Você é um gestor de tráfego sênior e estrategista de marketing digital na agência Keyroz Digital Solutions. Sua tarefa é atuar como um especialista para um cliente que não entende de marketing digital. O cliente fornecerá informações básicas e você deve criar uma estratégia de anúncios completa e robusta, respondendo inteiramente em português do Brasil.
 
-**Contexto do Cliente:**
+**Contexto do Cliente (fornecido por você):**
 {{{clientContext}}}
 
-**Detalhes da Campanha:**
-- **Produto/Serviço a ser Anunciado:** {{{productOrService}}}
+**O que o cliente quer anunciar:**
+- **Produto/Serviço:** {{{productOrService}}}
 - **Objetivo Principal:** {{{advertisingGoal}}}
-- **Plataformas:** {{{platforms}}}
-- **Tipo de Campanha:** {{{campaignType}}}
-- **Públicos-alvo:** {{{audiences}}}
-- **Interesses/Palavras-chave:** {{{interests}}}
-{{#if negativeKeywords}}- **Públicos/Palavras-chave a Negativar:** {{{negativeKeywords}}}{{/if}}
 
-Com base nessas informações, gere uma estrutura detalhada de publicidade. Você deve criar **{{{numCampaigns}}} campanhas distintas**. Dentro de cada campanha, crie **{{{numAdSets}}} conjuntos de anúncios** com diferentes segmentações. Para cada conjunto de anúncios, desenvolva **{{{numCreatives}}} ideias de criativos**.
+**Sua Missão como Especialista:**
+Com base nas informações acima, aja como o gestor de tráfego. Você deve decidir TUDO. Isso inclui:
+- Quais as melhores **plataformas** (Google Ads, Meta Ads, etc.).
+- Qual o **tipo de campanha** ideal para o objetivo (Vendas, Leads, etc.).
+- Quem são os **públicos-alvo**, quais seus **interesses**, **palavras-chave** e **comportamentos** para segmentação.
+- Quais **palavras-chave ou públicos negativar**.
+
+Gere uma estrutura detalhada de publicidade. Você deve criar **{{{numCampaigns}}} campanhas distintas**. Dentro de cada campanha, crie **{{{numAdSets}}} conjuntos de anúncios** com diferentes segmentações que você, como especialista, definir. Para cada conjunto de anúncios, desenvolva **{{{numCreatives}}} ideias de criativos**.
 
 Para cada **criativo**, você deve fornecer:
 - 3 opções de **títulos** persuasivos.
@@ -98,7 +97,7 @@ Para cada **criativo**, você deve fornecer:
 1.  **overallBudget**: Um objeto contendo uma sugestão de orçamento total (suggestion) e uma recomendação de alocação (allocation).
 2.  **summary**: Um resumo estratégico conciso, explicando qual campanha você acredita que terá o melhor desempenho e por quê.
 
-Seja criativo, estratégico e detalhado. Certifique-se de que sua resposta final siga estritamente o schema JSON de saída, incluindo todos os campos obrigatórios.
+Seja criativo, estratégico e detalhado. O cliente confia em você para tomar as melhores decisões. Certifique-se de que sua resposta final siga estritamente o schema JSON de saída.
 `,
 });
 

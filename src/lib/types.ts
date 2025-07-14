@@ -1,4 +1,7 @@
-import type { AdsIACreatorInput, AdsIACreatorOutput } from "./ai/flows/ads-ia-creator";
+import type { AdsIACreatorInput, AdsIACreatorOutput as AdsOutput } from "@/ai/flows/ads-ia-creator";
+
+// Custom type for the UI to be less verbose
+export interface AdsIACreatorOutput extends AdsOutput {}
 
 export type Prospect = {
   id: string;
@@ -65,10 +68,10 @@ export interface Project {
 export interface AdsCampaign {
   id: string;
   title: string;
-  request: AdsIACreatorInput;
+  request: Omit<AdsIACreatorInput, 'clientContext'>;
   response: AdsIACreatorOutput;
   createdAt: any; // Firestore Timestamp
 }
 
 // Re-exporting AI types to be used in the UI
-export type { AdsIACreatorInput, AdsIACreatorOutput };
+export type { AdsIACreatorInput };
