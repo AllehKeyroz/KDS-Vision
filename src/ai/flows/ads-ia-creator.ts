@@ -27,30 +27,34 @@ const AdsIACreatorInputSchema = z.object({
 });
 export type AdsIACreatorInput = z.infer<typeof AdsIACreatorInputSchema>;
 
+
+const CreativeSchema = z.object({
+    creativeName: z.string().describe('O nome do criativo (Ex: "Vídeo Demonstração Rápida").'),
+    titles: z.array(z.string()).describe('Uma lista de 3 títulos (headlines) para o anúncio.'),
+    descriptions: z.array(z.string()).describe('Uma lista de 3 descrições para o corpo do anúncio.'),
+    ctas: z.array(z.string()).describe('Uma lista de 3 chamadas para ação (call-to-actions), como "Compre Agora" ou "Saiba Mais".'),
+    imageIdeas: z.array(z.string()).describe('Uma lista de 3 ideias de visuais para o criativo (descreva a imagem ou vídeo).')
+});
+
+const AdSetSchema = z.object({
+    adSetName: z.string().describe('O nome do conjunto de anúncios (Ex: "Público Frio - Interesses").'),
+    targeting: z.string().describe('Os critérios de direcionamento para este conjunto (público, idade, interesses).'),
+    budget: z.number().describe('O orçamento diário ou vitalício sugerido para este conjunto.'),
+    creatives: z.array(CreativeSchema).describe('Uma lista de 5 criativos para este conjunto de anúncios.')
+});
+
+const CampaignSchema = z.object({
+    campaignName: z.string().describe('O nome da campanha (Ex: "Lançamento Produto X - Vendas").'),
+    adSets: z.array(AdSetSchema).describe('Uma lista de 3 conjuntos de anúncios para esta campanha.')
+});
+
 const AdsIACreatorOutputSchema = z.object({
-  campaignStructure: z.object({
-    campaignName: z.string().describe('The name of the campaign.'),
-    adSets: z.array(
-      z.object({
-        adSetName: z.string().describe('The name of the ad set.'),
-        targeting: z.string().describe('The targeting criteria for the ad set.'),
-        budget: z.number().describe('The budget for the ad set.'),
-        creatives: z.array(
-          z.object({
-            creativeName: z.string().describe('The name of the creative.'),
-            copy: z.string().describe('The ad copy for the creative.'),
-            description: z
-              .string()
-              .describe('A detailed description of the visual elements for the creative.'),
-          })
-        ),
-      })
-    ),
+  campaigns: z.array(CampaignSchema).describe('Uma lista de 3 estruturas de campanha completas.'),
+  overallBudget: z.object({
+      suggestion: z.number().describe('Uma sugestão de orçamento total para todas as campanhas.'),
+      allocation: z.string().describe('Uma recomendação de como alocar o orçamento entre as campanhas.'),
   }),
-  budgetSuggestion: z.number().describe('A suggested budget for the entire campaign.'),
-  budgetAllocation: z
-    .string()
-    .describe('A suggested allocation of the budget across the ad sets.'),
+  summary: z.string().describe('Um breve resumo da estratégia geral e qual campanha tem maior potencial de sucesso e porquê.')
 });
 export type AdsIACreatorOutput = z.infer<typeof AdsIACreatorOutputSchema>;
 
@@ -62,14 +66,29 @@ const prompt = ai.definePrompt({
   name: 'adsIACreatorPrompt',
   input: {schema: AdsIACreatorInputSchema},
   output: {schema: AdsIACreatorOutputSchema},
-  prompt: `You are an expert marketing strategist. Given the client's context, advertising goal, product/service, and target audience, generate a complete ad campaign structure, budget suggestions, and budget allocation.
+  prompt: `Você é um especialista em marketing e tráfego pago. Sua tarefa é criar uma estratégia de anúncios completa e robusta para um cliente da agência Keyroz Digital Solutions. Responda inteiramente em português do Brasil.
 
-Client Context: {{{clientContext}}}
-Advertising Goal: {{{advertisingGoal}}}
-Product/Service: {{{productOrService}}}
-Target Audience: {{{targetAudience}}}
+**Contexto do Cliente:**
+{{{clientContext}}}
 
-Based on this information, create an ad campaign structure with campaign name, ad sets (name, targeting, budget, creatives), a budget suggestion for the campaign, and a budget allocation across the ad sets. Provide detailed descriptions for the visual elements of each creative.
+**Objetivo da Publicidade:**
+{{{advertisingGoal}}}
+
+**Produto/Serviço a ser Anunciado:**
+{{{productOrService}}}
+
+**Público-alvo:**
+{{{targetAudience}}}
+
+Com base nessas informações, gere uma estrutura detalhada de publicidade. Você deve criar **3 campanhas distintas**, cada uma com um ângulo ou objetivo ligeiramente diferente. Dentro de cada campanha, crie **3 conjuntos de anúncios** com diferentes segmentações de público. Para cada conjunto de anúncios, desenvolva **5 ideias de criativos**.
+
+Para cada **criativo**, você deve fornecer:
+- 3 opções de **títulos** persuasivos.
+- 3 opções de **descrições** (corpo do anúncio).
+- 3 opções de **CTAs** (Call to Action).
+- 3 ideias distintas para a **imagem ou vídeo** do anúncio.
+
+Finalmente, forneça uma sugestão de **orçamento geral** com uma recomendação de alocação e um **resumo estratégico**, explicando qual campanha você acredita que terá o melhor desempenho e por quê. Seja criativo, estratégico e detalhado.
 `,
 });
 

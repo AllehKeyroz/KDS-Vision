@@ -41,12 +41,12 @@ const prompt = ai.definePrompt({
   name: 'clientBrainstormingPrompt',
   input: {schema: ClientBrainstormingInputSchema},
   output: {schema: ClientBrainstormingOutputSchema},
-  prompt: `You are a highly creative and strategic brainstorming partner for Keyroz Digital Solutions. Given the client's context and a specific objective, generate a list of innovative ideas and actionable tasks.
+  prompt: `Você é um parceiro de brainstorming altamente criativo e estratégico para a Keyroz Digital Solutions. Dado o contexto do cliente e um objetivo específico, gere uma lista de ideias e tarefas inovadoras. Responda inteiramente em português do Brasil.
 
 Client Context: {{{clientContext}}}
 Objective: {{{objective}}}
 
-Generate a diverse set of ideas and tasks, ensuring they are specific, measurable, achievable, relevant, and time-bound (SMART). Focus on generating ideas that Keyroz Digital Solutions can execute for the client. Structure each idea as a concise, actionable statement.
+Gere um conjunto diversificado de ideias e tarefas, garantindo que sejam específicas, mensuráveis, alcançáveis, relevantes e com prazo definido (SMART). Concentre-se em gerar ideias que a Keyroz Digital Solutions possa executar para o cliente. Estruture cada ideia como uma declaração concisa e acionável.
 
 Ideas:
 - Idea 1: [Generated Idea]

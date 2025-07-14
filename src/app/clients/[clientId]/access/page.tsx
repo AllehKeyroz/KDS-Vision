@@ -1,13 +1,13 @@
 
 'use client'
 
-import React, { useState, useEffect } from 'react';
+import React, 'useState', 'useEffect' } from 'react';
 import { useParams } from 'next/navigation';
 import { Card, CardContent } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Copy, Edit, PlusCircle, Trash2, Save, Loader2 } from 'lucide-react';
+import { Copy, Edit, PlusCircle, Trash2, Save, Loader2, KeyRound } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
@@ -57,11 +57,19 @@ export default function AccessPage() {
         return () => unsubscribe();
     }, [clientId, toast]);
 
-    const handleCopy = (text: string) => {
+    const handleCopy = (text: string, fieldName: string) => {
+        if (!text) {
+             toast({
+                title: 'Campo vazio',
+                description: `Não há ${fieldName} para copiar.`,
+                variant: 'destructive'
+            });
+            return;
+        }
         navigator.clipboard.writeText(text);
         toast({
             title: 'Copiado!',
-            description: 'A informação foi copiada para a área de transferência.',
+            description: `O ${fieldName} foi copiado para a área de transferência.`,
         });
     }
 
@@ -164,13 +172,16 @@ export default function AccessPage() {
                                 </TableCell>
                                 <TableCell>{access.login}</TableCell>
                                 <TableCell>
-                                    <Button variant="ghost" size="sm" onClick={() => handleCopy(access.password_plain)}>
+                                    <Button variant="ghost" size="sm" onClick={() => handleCopy(access.password_plain, 'senha')}>
                                         <Copy className="mr-2 h-3 w-3" />
                                         Copiar Senha
                                     </Button>
                                 </TableCell>
                                 <TableCell>
-                                    {access.apiKey ? <Badge>Presente</Badge> : <Badge variant="secondary">N/A</Badge>}
+                                    <Button variant="ghost" size="sm" onClick={() => handleCopy(access.apiKey, 'Chave API')}>
+                                        <KeyRound className="mr-2 h-3 w-3" />
+                                        Copiar Chave
+                                    </Button>
                                 </TableCell>
                                 <TableCell className="text-right">
                                     <AlertDialog>
