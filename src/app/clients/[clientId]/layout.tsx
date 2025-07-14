@@ -1,17 +1,19 @@
 'use client'
 
-import { CLIENTS_DATA } from '@/lib/data';
+import { db } from '@/lib/firebase';
+import type { Client } from '@/lib/types';
+import { doc, getDoc } from 'firebase/firestore';
 import Link from 'next/link';
 import { usePathname, useParams } from 'next/navigation';
-import Image from 'next/image';
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Bot, FileText, KeyRound, Lightbulb, Megaphone, Share2 } from 'lucide-react';
+import { Bot, FileText, KeyRound, Lightbulb, Megaphone, Share2, Wallet } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useEffect, useState } from 'react';
+import { Skeleton } from '@/components/ui/skeleton';
 
 const tabs = [
-  { name: 'Acessos', href: '', icon: KeyRound },
+  { name: 'Contexto', href: '', icon: FileText },
+  { name: 'Acessos', href: '/access', icon: KeyRound },
   { name: 'Brainstorm IA', href: '/brainstorming', icon: Lightbulb },
-  { name: 'Contexto', href: '/context', icon: FileText },
   { name: 'Agentes IA', href: '/agents', icon: Bot },
   { name: 'Social', href: '/social', icon: Share2 },
   { name: 'Ads Creator', href: '/ads', icon: Megaphone },
@@ -22,16 +24,53 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
   const pathname = usePathname();
   const clientId = params.clientId as string;
 
-  const client = CLIENTS_DATA.find(c => c.id === clientId);
+  const [client, setClient] = useState<Client | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!clientId) return;
+
+    const fetchClient = async () => {
+      setLoading(true);
+      const docRef = doc(db, "clients", clientId);
+      const docSnap = await getDoc(docRef);
+
+      if (docSnap.exists()) {
+        setClient({ id: docSnap.id, ...docSnap.data() } as Client);
+      } else {
+        console.log("No such document!");
+      }
+      setLoading(false);
+    };
+
+    fetchClient();
+  }, [clientId]);
+
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <Skeleton className="h-9 w-1/2" />
+        <div className="border-b border-white/10">
+          <div className="flex gap-2 sm:gap-8 px-0 sm:px-4 overflow-x-auto">
+            {tabs.map((tab) => (
+              <Skeleton key={tab.name} className="h-12 w-24" />
+            ))}
+          </div>
+        </div>
+        <Skeleton className="h-64 w-full" />
+      </div>
+    )
+  }
 
   if (!client) {
     return <div className="p-8 text-center">Cliente não encontrado.</div>;
   }
 
   const basePath = `/clients/${clientId}`;
-  // Handle /clients/[clientId] as the first tab
-  const currentPathSegment = pathname === basePath ? '' : pathname.substring(basePath.length);
-  
+  // Determine the active path segment. The root path for a client corresponds to the empty href.
+  const currentPathSegment = pathname.substring(basePath.length);
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:gap-4">
@@ -43,9 +82,9 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
       <div className="border-b border-white/10 animate-in fade-in-25 slide-in-from-bottom-4 duration-500 delay-100">
         <div className="flex gap-2 sm:gap-8 px-0 sm:px-4 overflow-x-auto">
           {tabs.map((tab, index) => {
-            const isActive = tab.href === currentPathSegment || (tab.href === '/context' && currentPathSegment === '');
+            const isActive = tab.href === currentPathSegment;
             return (
-              <Link href={`${basePath}${tab.href === '/context' ? '' : tab.href}`} key={tab.name} passHref>
+              <Link href={`${basePath}${tab.href}`} key={tab.name} passHref>
                 <div 
                   className={cn(
                     "flex flex-col items-center justify-center pb-3 pt-4 text-sm font-bold tracking-wide border-b-[3px] transition-all duration-300 ease-in-out whitespace-nowrap px-4",

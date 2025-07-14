@@ -30,7 +30,6 @@ export default function AccessPage() {
 
     return (
         <div className="space-y-6">
-            <h2 className="text-2xl font-bold tracking-tight">Acessos</h2>
             <form className="max-w-md space-y-4">
                 <div>
                     <Label htmlFor="platform" className="pb-2">Plataforma</Label>
