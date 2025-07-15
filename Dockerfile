@@ -1,55 +1,42 @@
-# Dockerfile
-RUN npm install --omit=dev
-# 1. Estágio de Dependências
-FROM node:20-alpine AS deps
+# 1. Base com dependências
+FROM node:20-alpine AS base
 WORKDIR /app
 
-# Copia package.json e lockfile
+# Copia arquivos de dependência
 COPY package.json package-lock.json* ./
-# Instala as dependências
-RUN npm install
 
-# 2. Estágio de Builder
-FROM node:20-alpine AS builder
+# Instala dependências com cache otimizado
+RUN npm ci
+
+# 2. Builder (compila a aplicação)
+FROM base AS builder
 WORKDIR /app
 
-# Copia as dependências do estágio anterior
-COPY --from=deps /app/node_modules ./node_modules
-# Copia o restante do código da aplicação
 COPY . .
-
-# Builda a aplicação
 ENV NEXT_TELEMETRY_DISABLED 1
+
 RUN npm run build
 
-# 3. Estágio de Produção (Runner)
+# 3. Runner (produção)
 FROM node:20-alpine AS runner
 WORKDIR /app
 
 ENV NODE_ENV=production
-ENV NEXT_TELEMETRY_DISABLED 1
+ENV NEXT_TELEMETRY_DISABLED=1
+ENV PORT=3000
+ENV HOSTNAME=0.0.0.0
 
-# Cria grupo e usuário para rodar a aplicação com menos privilégios
-RUN addgroup --system --gid 1001 nodejs
-RUN adduser --system --uid 1001 nextjs
+# Cria usuário menos privilegiado
+RUN addgroup --system --gid 1001 nodejs && \
+    adduser --system --uid 1001 nextjs
 
-# Copia os artefatos da build do estágio anterior
-COPY --from=builder /app/next.config.ts ./
-COPY --from=builder /app/.next ./.next
-COPY --from=builder /app/package.json ./package.json
-
-# Copia o diretório public apenas se ele existir
+# Copia artefatos standalone
+COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
+COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 COPY --from=builder --chown=nextjs:nodejs /app/public ./public || true
 
-# Define o proprietário dos arquivos para o usuário 'nextjs'
-RUN chown -R nextjs:nodejs ./.next
-RUN chown -R nextjs:nodejs ./public || true
-
-
-# Define o usuário para rodar a aplicação
 USER nextjs
 
 EXPOSE 3000
 
-# Define o comando para iniciar a aplicação
-CMD ["npm", "start", "-p", "3000"]
+CMD ["node", "server.js"]
