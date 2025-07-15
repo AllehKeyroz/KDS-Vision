@@ -11,7 +11,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { PlusCircle, Loader2, Edit, Trash2, MoreVertical, AlertTriangle } from 'lucide-react';
+import { PlusCircle, Loader2, Edit, Trash2, MoreVertical, AlertTriangle, Filter } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { db } from '@/lib/firebase';
 import { collection, addDoc, onSnapshot, doc, updateDoc, deleteDoc, serverTimestamp, Timestamp } from 'firebase/firestore';
@@ -21,6 +21,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { format } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
+import { Skeleton } from '@/components/ui/skeleton';
 
 export default function IssuesPage() {
     const params = useParams();
@@ -33,6 +34,8 @@ export default function IssuesPage() {
     const [isSaving, setIsSaving] = useState(false);
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const [currentIssue, setCurrentIssue] = useState<Partial<Issue> | null>(null);
+
+    const [filters, setFilters] = useState({ status: 'all', priority: 'all', responsibleId: 'all' });
 
     const issuesCollectionRef = useMemo(() => collection(db, 'clients', clientId, 'issues'), [clientId]);
     const usersCollectionRef = useMemo(() => collection(db, 'users'), []);
@@ -54,6 +57,16 @@ export default function IssuesPage() {
         };
     }, [issuesCollectionRef, usersCollectionRef]);
 
+    const filteredIssues = useMemo(() => {
+        return issues.filter(issue => {
+            const statusMatch = filters.status === 'all' || issue.status === filters.status;
+            const priorityMatch = filters.priority === 'all' || issue.priority === filters.priority;
+            const responsibleMatch = filters.responsibleId === 'all' || issue.responsibleId === filters.responsibleId;
+            return statusMatch && priorityMatch && responsibleMatch;
+        });
+    }, [issues, filters]);
+
+
     const handleOpenDialog = (issue: Partial<Issue> | null) => {
         setCurrentIssue(issue);
         setIsDialogOpen(true);
@@ -69,13 +82,16 @@ export default function IssuesPage() {
         setIsSaving(true);
         const formData = new FormData(event.currentTarget);
         
-        let issueData: Omit<Issue, 'id' | 'createdAt'> & { createdAt?: Timestamp } = {
+        let issueData: Omit<Issue, 'id' | 'createdAt'> & { createdAt?: Timestamp, resolvedAt?: Timestamp | null } = {
             title: formData.get('title') as string,
             description: formData.get('description') as string,
             priority: formData.get('priority') as Issue['priority'],
             status: formData.get('status') as Issue['status'],
-            responsibleId: formData.get('responsibleId') as string | undefined,
+            responsibleId: formData.get('responsibleId') as string,
         };
+        if (issueData.responsibleId === 'none') {
+            issueData.responsibleId = undefined;
+        }
 
         if (!issueData.title || !issueData.priority || !issueData.status) {
             toast({ title: "Campos obrigatórios", variant: "destructive" });
@@ -85,7 +101,10 @@ export default function IssuesPage() {
         
         if (issueData.status === 'Resolvido' && (!currentIssue || currentIssue.status !== 'Resolvido')) {
             issueData.resolvedAt = serverTimestamp() as Timestamp;
+        } else if (issueData.status !== 'Resolvido') {
+            issueData.resolvedAt = null;
         }
+
 
         try {
             if (currentIssue && currentIssue.id) {
@@ -129,13 +148,43 @@ export default function IssuesPage() {
 
     return (
         <div className="space-y-6">
-            <div className="flex justify-between items-center">
+            <div className="flex flex-wrap justify-between items-center gap-4">
                 <h1 className="text-2xl font-bold font-headline flex items-center gap-2"><AlertTriangle/> Central de Issues</h1>
                 <Button onClick={() => handleOpenDialog(null)}>
                     <PlusCircle className="mr-2 h-4 w-4" />
                     Adicionar Issue
                 </Button>
             </div>
+            
+            <Card>
+                <CardHeader>
+                    <CardTitle className="flex items-center gap-2"><Filter className="h-5 w-5"/> Filtros</CardTitle>
+                </CardHeader>
+                <CardContent className="flex flex-col md:flex-row gap-4">
+                    <div className="flex-1 space-y-2">
+                        <Label>Status</Label>
+                        <Select onValueChange={(value) => setFilters(f => ({...f, status: value}))} defaultValue="all">
+                            <SelectTrigger><SelectValue/></SelectTrigger>
+                            <SelectContent><SelectItem value="all">Todos</SelectItem><SelectItem value="Aberto">Aberto</SelectItem><SelectItem value="Em Andamento">Em Andamento</SelectItem><SelectItem value="Resolvido">Resolvido</SelectItem></SelectContent>
+                        </Select>
+                    </div>
+                    <div className="flex-1 space-y-2">
+                        <Label>Prioridade</Label>
+                        <Select onValueChange={(value) => setFilters(f => ({...f, priority: value}))} defaultValue="all">
+                            <SelectTrigger><SelectValue/></SelectTrigger>
+                            <SelectContent><SelectItem value="all">Todas</SelectItem><SelectItem value="Alta">Alta</SelectItem><SelectItem value="Média">Média</SelectItem><SelectItem value="Baixa">Baixa</SelectItem></SelectContent>
+                        </Select>
+                    </div>
+                    <div className="flex-1 space-y-2">
+                        <Label>Responsável</Label>
+                        <Select onValueChange={(value) => setFilters(f => ({...f, responsibleId: value}))} defaultValue="all">
+                            <SelectTrigger><SelectValue/></SelectTrigger>
+                            <SelectContent><SelectItem value="all">Todos</SelectItem>{users.map(user => <SelectItem key={user.id} value={user.id}>{user.name}</SelectItem>)}</SelectContent>
+                        </Select>
+                    </div>
+                </CardContent>
+            </Card>
+
 
             <Card>
                 <CardHeader>
@@ -143,9 +192,7 @@ export default function IssuesPage() {
                     <CardDescription>Gerencie problemas, bugs e outras pendências deste cliente.</CardDescription>
                 </CardHeader>
                 <CardContent>
-                    {isLoading ? (
-                        <div className="flex justify-center items-center h-64"><Loader2 className="h-8 w-8 animate-spin" /></div>
-                    ) : (
+                    <div className="overflow-x-auto">
                         <Table>
                             <TableHeader>
                                 <TableRow>
@@ -158,11 +205,22 @@ export default function IssuesPage() {
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {issues.length > 0 ? issues.map((issue) => {
+                                {isLoading ? (
+                                    Array.from({length: 3}).map((_, i) => (
+                                        <TableRow key={i}>
+                                            <TableCell><Skeleton className="h-5 w-32" /></TableCell>
+                                            <TableCell><Skeleton className="h-5 w-24" /></TableCell>
+                                            <TableCell><Skeleton className="h-5 w-20" /></TableCell>
+                                            <TableCell><Skeleton className="h-5 w-28" /></TableCell>
+                                            <TableCell><Skeleton className="h-5 w-24" /></TableCell>
+                                            <TableCell className="text-right"><Skeleton className="h-8 w-8 ml-auto" /></TableCell>
+                                        </TableRow>
+                                    ))
+                                ) : filteredIssues.length > 0 ? filteredIssues.map((issue) => {
                                     const responsible = users.find(u => u.id === issue.responsibleId);
                                     return (
                                         <TableRow key={issue.id}>
-                                            <TableCell className="font-medium">{issue.title}</TableCell>
+                                            <TableCell className="font-medium max-w-xs truncate">{issue.title}</TableCell>
                                             <TableCell><Badge className={cn(statusBadgeColor[issue.status])}>{issue.status}</Badge></TableCell>
                                             <TableCell><Badge variant={priorityBadgeVariant[issue.priority]}>{issue.priority}</Badge></TableCell>
                                             <TableCell>{responsible?.name || 'N/A'}</TableCell>
@@ -189,11 +247,11 @@ export default function IssuesPage() {
                                         </TableRow>
                                     )
                                 }) : (
-                                    <TableRow><TableCell colSpan={6} className="h-24 text-center">Nenhuma issue registrada.</TableCell></TableRow>
+                                    <TableRow><TableCell colSpan={6} className="h-24 text-center">Nenhuma issue encontrada com os filtros atuais.</TableCell></TableRow>
                                 )}
                             </TableBody>
                         </Table>
-                    )}
+                    </div>
                 </CardContent>
             </Card>
             
@@ -220,7 +278,7 @@ export default function IssuesPage() {
                             </div>
                         </div>
                         <div className="space-y-2"><Label htmlFor="responsibleId">Responsável</Label>
-                            <Select name="responsibleId" defaultValue={currentIssue?.responsibleId}>
+                            <Select name="responsibleId" defaultValue={currentIssue?.responsibleId || 'none'}>
                                 <SelectTrigger id="responsibleId"><SelectValue placeholder="Ninguém atribuído" /></SelectTrigger>
                                 <SelectContent><SelectItem value="none">Ninguém</SelectItem>{users.map(user => (<SelectItem key={user.id} value={user.id}>{user.name}</SelectItem>))}</SelectContent>
                             </Select>

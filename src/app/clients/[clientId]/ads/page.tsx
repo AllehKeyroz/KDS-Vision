@@ -18,6 +18,7 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { collection, addDoc, onSnapshot, serverTimestamp, doc, deleteDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
+import { Skeleton } from '@/components/ui/skeleton';
 
 export default function AdsCreatorPage() {
     const params = useParams();
@@ -182,12 +183,17 @@ export default function AdsCreatorPage() {
 
             <div className="space-y-4">
                 <h2 className="text-2xl font-bold font-headline flex items-center gap-2"><GalleryVerticalEnd /> Galeria de Campanhas</h2>
-                {isCampaignsLoading ? <Loader2 className="animate-spin" /> :
+                {isCampaignsLoading ? (
+                    <div className="space-y-4">
+                        <Skeleton className="h-24 w-full" />
+                        <Skeleton className="h-24 w-full" />
+                    </div>
+                ) :
                  savedCampaigns.length === 0 ? <p className="text-muted-foreground">Nenhuma campanha salva ainda.</p> :
                  <Accordion type="multiple" className="w-full space-y-4">
                      {savedCampaigns.map(campaign => (
                          <Card key={campaign.id}>
-                           <CardHeader className="flex flex-row justify-between items-start">
+                           <CardHeader className="flex flex-row justify-between items-start cursor-pointer">
                                 <div>
                                     <CardTitle className="font-headline text-xl">{campaign.title}</CardTitle>
                                     <CardDescription>Criado em: {new Date(campaign.createdAt?.toDate()).toLocaleDateString()}</CardDescription>
@@ -197,7 +203,14 @@ export default function AdsCreatorPage() {
                                 </Button>
                             </CardHeader>
                              <CardContent>
-                                 <GeneratedCampaignContent result={campaign.response} />
+                                <Accordion type="single" collapsible>
+                                    <AccordionItem value="item-1">
+                                        <AccordionTrigger>Mostrar Detalhes</AccordionTrigger>
+                                        <AccordionContent>
+                                            <GeneratedCampaignContent result={campaign.response} />
+                                        </AccordionContent>
+                                    </AccordionItem>
+                                </Accordion>
                              </CardContent>
                          </Card>
                      ))}
@@ -218,7 +231,7 @@ function GeneratedCampaignContent({ result }: { result: AdsIACreatorOutput }) {
                 </CardHeader>
                 <CardContent className="space-y-4">
                      <div className="flex flex-wrap gap-2">
-                        <Badge variant="secondary" className="flex items-center gap-2"><Wallet className="w-4 h-4"/> Orçamento Sugerido: R$ {result.overallBudget.suggestion.toFixed(2)}</Badge>
+                        <Badge variant="secondary" className="flex items-center gap-2"><Wallet className="w-4 h-4"/> Orçamento Sugerido: {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(result.overallBudget.suggestion)}</Badge>
                         <Badge variant="secondary" className="flex items-center gap-2"><Lightbulb className="w-4 h-4"/> Alocação: {result.overallBudget.allocation}</Badge>
                     </div>
                     <p className="text-sm text-muted-foreground">{result.summary}</p>
@@ -242,7 +255,7 @@ function GeneratedCampaignContent({ result }: { result: AdsIACreatorOutput }) {
                                         <AccordionContent className="pl-6 space-y-4">
                                             <p><span className="font-semibold">Plataformas Recomendadas:</span> {adSet.platforms}</p>
                                             <p><span className="font-semibold">Direcionamento:</span> {adSet.targeting}</p>
-                                            <p><span className="font-semibold">Orçamento do Conjunto:</span> R$ {adSet.budget.toFixed(2)}</p>
+                                            <p><span className="font-semibold">Orçamento do Conjunto:</span> {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(adSet.budget)}</p>
                                             <h4 className="font-semibold text-md mt-4">Criativos:</h4>
                                             <Accordion type="multiple" className="w-full space-y-2">
                                                 {adSet.creatives.map((creative, cIndex) => (
@@ -290,4 +303,3 @@ function GeneratedCampaignContent({ result }: { result: AdsIACreatorOutput }) {
         </div>
     );
 }
-

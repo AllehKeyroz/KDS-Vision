@@ -1,3 +1,4 @@
+
 'use client'
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -16,6 +17,7 @@ import { collection, addDoc, onSnapshot, serverTimestamp, doc, updateDoc, delete
 import { db } from '@/lib/firebase';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
+import { Skeleton } from '@/components/ui/skeleton';
 
 export default function BrainstormingPage() {
     const params = useParams();
@@ -35,7 +37,7 @@ export default function BrainstormingPage() {
     useEffect(() => {
         const unsubscribe = onSnapshot(sessionsCollectionRef, (snapshot) => {
             const sessionsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as BrainstormSession));
-            setSessions(sessionsData.sort((a, b) => b.createdAt - a.createdAt));
+            setSessions(sessionsData.sort((a, b) => b.createdAt.toMillis() - a.createdAt.toMillis()));
             setIsSessionsLoading(false);
         });
         return () => unsubscribe();
@@ -181,7 +183,12 @@ export default function BrainstormingPage() {
 
             <div className="space-y-4">
                 <h2 className="text-2xl font-bold font-headline">Histórico de Sessões</h2>
-                {isSessionsLoading ? <Loader2 className="animate-spin" /> :
+                {isSessionsLoading ? (
+                    <div className="space-y-4">
+                        <Skeleton className="h-40 w-full" />
+                        <Skeleton className="h-40 w-full" />
+                    </div>
+                 ) :
                  sessions.length === 0 ? <p className="text-muted-foreground">Nenhuma sessão salva ainda.</p> :
                  sessions.map(session => (
                     <Card key={session.id}>

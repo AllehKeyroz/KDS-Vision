@@ -6,18 +6,15 @@ import type { Client } from '@/lib/types';
 import { doc, getDoc } from 'firebase/firestore';
 import Link from 'next/link';
 import { usePathname, useParams } from 'next/navigation';
-import { Bot, FileText, KeyRound, Lightbulb, Megaphone, Share2, Wallet, Folder, CheckSquare, AlertTriangle } from 'lucide-react';
+import { Bot, FileText, KeyRound, Lightbulb, Megaphone, Share2, Wallet, Folder, CheckSquare, AlertTriangle, Wand2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useEffect, useState } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
 
 const tabs = [
   { name: 'Projetos', href: '/projects', icon: Folder },
-  { name: 'Ads Creator', href: '/ads', icon: Megaphone },
-  { name: 'Social', href: '/social', icon: Share2 },
-  { name: 'Brainstorm IA', href: '/brainstorming', icon: Lightbulb },
+  { name: 'Ferramentas IA', href: '/tools', icon: Wand2 },
   { name: 'Processos', href: '/processos', icon: CheckSquare },
-  { name: 'Agentes IA', href: '/agents', icon: Bot },
   { name: 'Issues', href: '/issues', icon: AlertTriangle },
   { name: 'Acessos', href: '/access', icon: KeyRound },
   { name: 'Contexto', href: '', icon: FileText },
@@ -91,11 +88,12 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
               <Link href={`${basePath}${tab.href}`} key={tab.name} passHref>
                 <div 
                   className={cn(
-                    "flex flex-col items-center justify-center pb-3 pt-4 text-sm font-bold tracking-wide border-b-[3px] transition-all duration-300 ease-in-out whitespace-nowrap px-4",
+                    "flex items-center gap-2 pb-3 pt-4 text-sm font-bold tracking-wide border-b-[3px] transition-all duration-300 ease-in-out whitespace-nowrap px-4",
                     isActive ? "border-primary text-primary glow-primary" : "border-transparent text-muted-foreground hover:text-foreground hover:border-primary/50"
                   )}
                   style={{ animationDelay: `${150 + index * 50}ms` }}
                 >
+                  <tab.icon className="h-4 w-4" />
                   {tab.name}
                 </div>
               </Link>

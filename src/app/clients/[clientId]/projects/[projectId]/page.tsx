@@ -33,6 +33,7 @@ import { Dialog, DialogHeader, DialogTitle, DialogDescription, DialogFooter, Dia
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
+import { Skeleton } from '@/components/ui/skeleton';
 
 
 export default function ProjectDetailPage() {
@@ -241,7 +242,21 @@ export default function ProjectDetailPage() {
     }, [project, filters]);
 
     if (isLoading) {
-        return <div className="flex justify-center items-center h-64"><Loader2 className="h-8 w-8 animate-spin" /></div>;
+        return (
+             <div className="space-y-6">
+                 <Skeleton className="h-10 w-40" />
+                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <div className="lg:col-span-2 space-y-6">
+                        <Skeleton className="h-40 w-full" />
+                        <Skeleton className="h-28 w-full" />
+                    </div>
+                    <div className="lg:col-span-1">
+                        <Skeleton className="h-56 w-full" />
+                    </div>
+                </div>
+                 <Skeleton className="h-64 w-full" />
+            </div>
+        )
     }
 
     if (!project) {

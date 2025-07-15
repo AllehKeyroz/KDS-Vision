@@ -1,3 +1,4 @@
+
 'use client'
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -16,6 +17,7 @@ import type { SocialSession } from '@/lib/types';
 import { collection, addDoc, onSnapshot, serverTimestamp, doc, updateDoc, deleteDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Skeleton } from '@/components/ui/skeleton';
 
 export default function SocialStrategistPage() {
     const params = useParams();
@@ -39,7 +41,7 @@ export default function SocialStrategistPage() {
     useEffect(() => {
         const unsubscribe = onSnapshot(sessionsCollectionRef, (snapshot) => {
             const sessionsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as SocialSession));
-            setSessions(sessionsData.sort((a, b) => b.createdAt - a.createdAt));
+            setSessions(sessionsData.sort((a, b) => b.createdAt.toMillis() - a.createdAt.toMillis()));
             setIsSessionsLoading(false);
         });
         return () => unsubscribe();
@@ -187,7 +189,12 @@ export default function SocialStrategistPage() {
 
             <div className="space-y-4">
                 <h2 className="text-2xl font-bold font-headline">Histórico de Estratégias</h2>
-                {isSessionsLoading ? <Loader2 className="animate-spin" /> :
+                {isSessionsLoading ? (
+                    <div className="space-y-4">
+                        <Skeleton className="h-40 w-full" />
+                        <Skeleton className="h-40 w-full" />
+                    </div>
+                ) :
                  sessions.length === 0 ? <p className="text-muted-foreground">Nenhuma estratégia salva ainda.</p> :
                  sessions.map(session => (
                     <Card key={session.id}>
