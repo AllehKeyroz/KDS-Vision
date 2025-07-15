@@ -438,7 +438,7 @@ export default function DashboardPage() {
                             <div key={app.id} className="text-sm p-2 rounded-md bg-secondary/50 mb-1">
                                 <p className="font-bold">{app.title}</p>
                                 <p className="text-xs text-muted-foreground">Horário: {format(app.date, 'HH:mm')}</p>
-                                <p className="text-xs text-muted-foreground">Responsáveis: {app.userIds.map(uid => users.find(u => u.id === uid)?.name || '').join(', ')}</p>
+                                {app.userIds && <p className="text-xs text-muted-foreground">Responsáveis: {app.userIds.map(uid => users.find(u => u.id === uid)?.name || '').join(', ')}</p>}
                                 {app.notes && <p className="text-xs mt-1">{app.notes}</p>}
                             </div>
                         ))}
