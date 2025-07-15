@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { PlusCircle, Loader2, Edit, Trash2, MoreVertical, ArrowUpCircle, ArrowDownCircle } from 'lucide-react';
+import { PlusCircle, Loader2, Edit, Trash2, MoreVertical, ArrowUpCircle, ArrowDownCircle, RefreshCcw, DollarSign } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { db } from '@/lib/firebase';
 import { collection, addDoc, onSnapshot, doc, updateDoc, deleteDoc, serverTimestamp, Timestamp } from 'firebase/firestore';
@@ -20,6 +20,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 
+const financialsCollectionRef = collection(db, 'financials');
 
 export default function FinancialsPage() {
     const { toast } = useToast();
@@ -28,8 +29,6 @@ export default function FinancialsPage() {
     const [isSaving, setIsSaving] = useState(false);
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const [currentTransaction, setCurrentTransaction] = useState<Partial<FinancialTransaction> | null>(null);
-
-    const financialsCollectionRef = useMemo(() => collection(db, 'financials'), []);
 
     useEffect(() => {
         const unsubscribe = onSnapshot(financialsCollectionRef, (snapshot) => {
@@ -45,7 +44,7 @@ export default function FinancialsPage() {
             setIsLoading(false);
         });
         return () => unsubscribe();
-    }, [financialsCollectionRef]);
+    }, []);
 
     const handleOpenDialog = (transaction: Partial<FinancialTransaction> | null) => {
         setCurrentTransaction(transaction);
@@ -181,7 +180,7 @@ export default function FinancialsPage() {
                                             </span>
                                         </TableCell>
                                         <TableCell>{t.recurring ? "Sim" : "Não"}</TableCell>
-                                        <TableCell>{format(t.date, 'dd/MM/yyyy')}</TableCell>
+                                        <TableCell>{t.date ? format(t.date, 'dd/MM/yyyy') : ''}</TableCell>
                                         <TableCell className="text-right">
                                              <DropdownMenu>
                                                 <DropdownMenuTrigger asChild>
@@ -266,6 +265,3 @@ export default function FinancialsPage() {
         </div>
     );
 }
-
-// Add imports to the top of the file as needed
-import { RefreshCcw, DollarSign } from 'lucide-react';
