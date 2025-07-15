@@ -14,7 +14,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
-import { format, addMinutes, setHours, setMinutes } from 'date-fns';
+import { format, addMinutes, setHours, setMinutes, startOfDay } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger, DialogClose, DialogFooter } from '@/components/ui/dialog';
@@ -26,6 +26,14 @@ import { ptBR } from 'date-fns/locale';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { Badge } from '@/components/ui/badge';
 
+interface NewAppointmentState {
+  title: string;
+  notes: string;
+  userIds: string[];
+  clientId?: string;
+  time?: Date;
+  duration: number;
+}
 
 export default function DashboardPage() {
   const { toast } = useToast();
@@ -41,7 +49,7 @@ export default function DashboardPage() {
   const [filters, setFilters] = useState({ responsible: '', deadline: null as Date | null });
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
   const [isAppointmentDialogOpen, setIsAppointmentDialogOpen] = useState(false);
-  const [newAppointment, setNewAppointment] = useState<{ title: string; notes: string; userIds: string[], clientId?: string }>({ title: '', notes: '', userIds: [] });
+  const [newAppointment, setNewAppointment] = useState<NewAppointmentState>({ title: '', notes: '', userIds: [], duration: 30 });
 
   useEffect(() => {
     const unsubscribes: (() => void)[] = [];
@@ -115,25 +123,70 @@ export default function DashboardPage() {
 
   const handleDateSelect = (date: Date | undefined) => {
     if (!date) return;
-    setSelectedDate(date);
+    setSelectedDate(startOfDay(date));
     setIsAppointmentDialogOpen(true);
   };
   
+  const dailyAppointments = useMemo(() => {
+    if (!selectedDate) return [];
+    const dateStr = format(selectedDate, 'yyyy-MM-dd');
+    return appointments.filter(app => format(app.date, 'yyyy-MM-dd') === dateStr);
+  }, [appointments, selectedDate]);
+  
+  const timeSlots = useMemo(() => {
+    if (!selectedDate) return [];
+    const start = setMinutes(setHours(selectedDate, 8), 0);
+    const end = setMinutes(setHours(selectedDate, 18), 0);
+    const slots = [];
+    let currentTime = start;
+
+    while (currentTime < end) {
+      const isBooked = dailyAppointments.some(app => {
+        const appStart = app.date.getTime();
+        const appEnd = addMinutes(app.date, app.duration || 30).getTime();
+        return currentTime.getTime() >= appStart && currentTime.getTime() < appEnd;
+      });
+      slots.push({ time: currentTime, booked: isBooked });
+      currentTime = addMinutes(currentTime, 30);
+    }
+    return slots;
+  }, [selectedDate, dailyAppointments]);
+  
   const handleAddAppointment = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newAppointment.title || newAppointment.userIds.length === 0 || !selectedDate) {
-        toast({ title: 'Campos obrigatórios', description: 'Título e ao menos um responsável são necessários.', variant: 'destructive' });
+    if (!newAppointment.title || newAppointment.userIds.length === 0 || !newAppointment.time) {
+        toast({ title: 'Campos obrigatórios', description: 'Título, horário e ao menos um responsável são necessários.', variant: 'destructive' });
         return;
     }
+
+    const slotsNeeded = newAppointment.duration / 30;
+    const startIndex = timeSlots.findIndex(slot => slot.time.getTime() === newAppointment.time?.getTime());
+    
+    if (startIndex === -1) {
+        toast({ title: 'Horário inválido', variant: 'destructive' });
+        return;
+    }
+
+    for (let i = 0; i < slotsNeeded; i++) {
+        if (startIndex + i >= timeSlots.length || timeSlots[startIndex + i].booked) {
+            toast({ title: 'Horário indisponível', description: 'O horário selecionado não tem tempo livre suficiente para a duração do compromisso.', variant: 'destructive' });
+            return;
+        }
+    }
+
     setIsSaving(true);
     try {
         await addDoc(collection(db, 'appointments'), {
-            ...newAppointment,
-            date: Timestamp.fromDate(selectedDate),
+            title: newAppointment.title,
+            notes: newAppointment.notes,
+            userIds: newAppointment.userIds,
+            clientId: newAppointment.clientId || null,
+            date: Timestamp.fromDate(newAppointment.time),
+            duration: newAppointment.duration,
         });
         toast({ title: 'Compromisso Adicionado!', description: 'O novo compromisso foi salvo.' });
         setIsAppointmentDialogOpen(false);
-        setNewAppointment({ title: '', notes: '', userIds: [] });
+        setNewAppointment({ title: '', notes: '', userIds: [], duration: 30 });
     } catch (error) {
         toast({ title: 'Erro ao salvar', variant: 'destructive' });
     } finally {
@@ -141,34 +194,9 @@ export default function DashboardPage() {
     }
   };
   
-  const dailyAppointments = useMemo(() => {
-    if (!selectedDate) return [];
-    return appointments.filter(app => format(app.date, 'yyyy-MM-dd') === format(selectedDate, 'yyyy-MM-dd'));
-  }, [appointments, selectedDate]);
-  
   const appointmentDates = useMemo(() => {
       return appointments.map(app => app.date);
   }, [appointments]);
-
-  const timeSlots = useMemo(() => {
-    if (!selectedDate) return [];
-    const startOfDay = setMinutes(setHours(selectedDate, 8), 0);
-    const endOfDay = setMinutes(setHours(selectedDate, 18), 0);
-    const slots = [];
-    let currentTime = startOfDay;
-
-    const dailyAppointments = appointments.filter(app => format(app.date, 'yyyy-MM-dd') === format(selectedDate, 'yyyy-MM-dd'));
-
-    while (currentTime < endOfDay) {
-      const isBooked = dailyAppointments.some(app => {
-        const appTime = app.date.getTime();
-        return appTime >= currentTime.getTime() && appTime < addMinutes(currentTime, 30).getTime();
-      });
-      slots.push({ time: currentTime, booked: isBooked });
-      currentTime = addMinutes(currentTime, 30);
-    }
-    return slots;
-  }, [selectedDate, appointments]);
 
 
   const calculateProgress = (project: Project): number => {
@@ -409,6 +437,7 @@ export default function DashboardPage() {
                         {dailyAppointments.map(app => (
                             <div key={app.id} className="text-sm p-2 rounded-md bg-secondary/50 mb-1">
                                 <p className="font-bold">{app.title}</p>
+                                <p className="text-xs text-muted-foreground">Horário: {format(app.date, 'HH:mm')}</p>
                                 <p className="text-xs text-muted-foreground">Responsáveis: {app.userIds.map(uid => users.find(u => u.id === uid)?.name || '').join(', ')}</p>
                                 {app.notes && <p className="text-xs mt-1">{app.notes}</p>}
                             </div>
@@ -422,7 +451,12 @@ export default function DashboardPage() {
           </Card>
       </div>
 
-       <Dialog open={isAppointmentDialogOpen} onOpenChange={setIsAppointmentDialogOpen}>
+       <Dialog open={isAppointmentDialogOpen} onOpenChange={(isOpen) => {
+            setIsAppointmentDialogOpen(isOpen);
+            if (!isOpen) {
+                setNewAppointment({ title: '', notes: '', userIds: [], duration: 30 });
+            }
+       }}>
         <DialogContent className="sm:max-w-[625px]">
             <DialogHeader>
                 <DialogTitle>Adicionar Compromisso</DialogTitle>
@@ -436,6 +470,30 @@ export default function DashboardPage() {
                         <Label htmlFor="title">Título do Compromisso</Label>
                         <Input id="title" value={newAppointment.title} onChange={e => setNewAppointment(p => ({...p, title: e.target.value}))} required />
                     </div>
+                    
+                    <div className="grid grid-cols-2 gap-4">
+                        <div>
+                             <Label>Horário de Início</Label>
+                             <Input type="text" readOnly value={newAppointment.time ? format(newAppointment.time, 'HH:mm') : "Selecione um horário"} className="bg-muted"/>
+                        </div>
+                        <div>
+                            <Label htmlFor="duration">Duração (min)</Label>
+                            <Select 
+                                value={String(newAppointment.duration)} 
+                                onValueChange={value => setNewAppointment(p => ({...p, duration: Number(value)}))}>
+                                <SelectTrigger>
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="30">30 min</SelectItem>
+                                    <SelectItem value="60">60 min</SelectItem>
+                                    <SelectItem value="90">90 min</SelectItem>
+                                    <SelectItem value="120">120 min</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+                    </div>
+
                     <div>
                         <Label>Atribuir a</Label>
                         <Popover>
@@ -521,13 +579,18 @@ export default function DashboardPage() {
                     <ScrollArea className="h-80 border rounded-md p-2">
                         <div className="space-y-1">
                             {timeSlots.map(slot => (
-                                <div key={slot.time.toISOString()} className={cn(
-                                    "p-2 rounded-md text-xs flex justify-between items-center",
-                                    slot.booked ? "bg-red-900/50 text-muted-foreground" : "bg-secondary"
+                                <button key={slot.time.toISOString()} 
+                                    onClick={() => !slot.booked && setNewAppointment(p => ({...p, time: slot.time}))}
+                                    disabled={slot.booked}
+                                    className={cn(
+                                        "w-full p-2 rounded-md text-xs flex justify-between items-center",
+                                        "transition-colors",
+                                        slot.booked ? "bg-red-900/50 text-muted-foreground cursor-not-allowed" : "bg-secondary hover:bg-accent",
+                                        newAppointment.time?.getTime() === slot.time.getTime() && !slot.booked && "ring-2 ring-primary bg-primary/20"
                                 )}>
                                     <span>{format(slot.time, 'HH:mm')} - {format(addMinutes(slot.time, 30), 'HH:mm')}</span>
                                     <Badge variant={slot.booked ? "destructive" : "default"}>{slot.booked ? "Ocupado" : "Livre"}</Badge>
-                                </div>
+                                </button>
                             ))}
                         </div>
                     </ScrollArea>

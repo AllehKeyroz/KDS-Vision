@@ -81,6 +81,7 @@ export interface Project {
   status: 'Planejamento' | 'Em Andamento' | 'Pausado' | 'Concluído';
   sections?: ProjectSection[];
   createdAt?: any;
+  clientId: string; // Add this line
 }
 
 
@@ -114,6 +115,7 @@ export interface Appointment {
   id: string;
   title: string;
   date: Date; // Stored as Timestamp in Firestore, converted to Date on client
+  duration: number; // in minutes
   userIds: string[];
   clientId?: string;
   notes?: string;
