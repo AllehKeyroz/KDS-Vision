@@ -96,6 +96,7 @@ export interface ProjectSection {
 
 export interface Project {
   id: string;
+  clientId: string;
   name: string;
   scope: string;
   value: number;
@@ -103,7 +104,6 @@ export interface Project {
   status: 'Planejamento' | 'Em Andamento' | 'Pausado' | 'Concluído';
   sections?: ProjectSection[];
   createdAt?: any;
-  clientId: string;
 }
 
 

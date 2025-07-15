@@ -23,6 +23,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { formatCurrency } from '@/lib/utils';
+import { Skeleton } from '@/components/ui/skeleton';
 
 export default function ProjectsPage() {
     const params = useParams();
@@ -61,15 +62,14 @@ export default function ProjectsPage() {
         event.preventDefault();
         setIsSaving(true);
         const formData = new FormData(event.currentTarget);
-        const projectData = {
+        const projectData: Partial<Project> = {
             name: formData.get('name') as string,
             scope: formData.get('scope') as string,
             value: Number(formData.get('value')),
-            cost: Number(formData.get('cost') || 0),
             status: formData.get('status') as Project['status'],
         };
 
-        if (!projectData.name || !projectData.scope || isNaN(projectData.value)) {
+        if (!projectData.name || !projectData.scope || isNaN(projectData.value as number)) {
             toast({ title: "Campos obrigatórios", description: "Nome, escopo e valor são obrigatórios.", variant: "destructive" });
             setIsSaving(false);
             return;
@@ -81,7 +81,7 @@ export default function ProjectsPage() {
                 await updateDoc(docRef, projectData);
                 toast({ title: "Projeto Atualizado!", description: "O projeto foi atualizado com sucesso." });
             } else {
-                await addDoc(projectsCollectionRef, { ...projectData, createdAt: serverTimestamp(), sections: [] });
+                await addDoc(projectsCollectionRef, { ...projectData, clientId, createdAt: serverTimestamp(), sections: [] });
                 toast({ title: "Projeto Adicionado!", description: "O novo projeto foi criado." });
             }
             handleCloseDialog();
@@ -122,8 +122,8 @@ export default function ProjectsPage() {
             </div>
 
             {isLoading ? (
-                <div className="flex justify-center items-center h-64">
-                    <Loader2 className="h-8 w-8 animate-spin" />
+                <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+                    {Array.from({length:3}).map((_, i) => <Card key={i}><CardHeader><Skeleton className="h-6 w-3/4" /></CardHeader><CardContent><Skeleton className="h-20 w-full" /></CardContent></Card>)}
                 </div>
             ) : projects.length === 0 ? (
                 <Card className="text-center py-12">
@@ -199,14 +199,10 @@ export default function ProjectsPage() {
                             <Label htmlFor="scope">Escopo</Label>
                             <Textarea id="scope" name="scope" defaultValue={currentProject?.scope} required />
                         </div>
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1">
                             <div>
                                 <Label htmlFor="value">Valor (R$)</Label>
                                 <Input id="value" name="value" type="number" step="0.01" defaultValue={currentProject?.value} required />
-                            </div>
-                            <div>
-                                <Label htmlFor="cost">Custo Estimado (R$)</Label>
-                                <Input id="cost" name="cost" type="number" step="0.01" defaultValue={currentProject?.cost || ''} placeholder="Opcional" />
                             </div>
                         </div>
                          <div className="grid grid-cols-1">

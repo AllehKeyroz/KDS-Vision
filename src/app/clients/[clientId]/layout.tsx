@@ -12,12 +12,12 @@ import { useEffect, useState } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
 
 const tabs = [
+  { name: 'Contexto', href: '', icon: FileText },
   { name: 'Projetos', href: '/projects', icon: Folder },
   { name: 'Ferramentas IA', href: '/tools', icon: Wand2 },
   { name: 'Processos', href: '/processos', icon: CheckSquare },
   { name: 'Issues', href: '/issues', icon: AlertTriangle },
   { name: 'Acessos', href: '/access', icon: KeyRound },
-  { name: 'Contexto', href: '', icon: FileText },
 ];
 
 export default function ClientLayout({ children }: { children: React.ReactNode }) {

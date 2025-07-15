@@ -207,7 +207,7 @@ export default function UsersPage() {
                         <div className="grid grid-cols-2 gap-4">
                             <div>
                                 <Label htmlFor="role">Função</Label>
-                                <Select name="role" defaultValue={currentUser?.role}>
+                                <Select name="role" defaultValue={currentUser?.role || 'Analista'}>
                                     <SelectTrigger id="role">
                                         <SelectValue placeholder="Selecione a função" />
                                     </SelectTrigger>
@@ -237,5 +237,3 @@ export default function UsersPage() {
         </div>
     );
 }
-
-    
