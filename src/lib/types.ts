@@ -100,6 +100,16 @@ export interface User {
   avatar: string;
 }
 
+export interface FinancialTransaction {
+  id: string;
+  description: string;
+  amount: number;
+  type: 'income' | 'expense';
+  date: any; // Firestore Timestamp
+  category?: string;
+  recurring: boolean;
+}
+
 
 // Re-exporting AI types to be used in the UI
 export type { AdsIACreatorInput };
