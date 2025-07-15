@@ -5,17 +5,17 @@ import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Briefcase, Users, ArrowRight, FolderKanban, ListTodo, Filter, CalendarIcon as CalendarIconLucide, User as UserIcon, PlusCircle, CheckCircle2, Loader2, Check, ChevronsUpDown, Trash2 } from 'lucide-react';
+import { Briefcase, Users, ArrowRight, FolderKanban, ListTodo, Filter, CalendarIcon as CalendarIconLucide, User as UserIcon, PlusCircle, CheckCircle2, Loader2, Check, ChevronsUpDown, Trash2, DollarSign, RefreshCcw, ShoppingCart, ArrowUpCircle, ArrowDownCircle } from 'lucide-react';
 import { db } from '@/lib/firebase';
 import { collection, onSnapshot, query, where, Timestamp, addDoc, doc, updateDoc, deleteDoc } from 'firebase/firestore';
-import type { Client, Prospect, Project, Task, User, Appointment } from '@/lib/types';
+import type { Client, Prospect, Project, Task, User, Appointment, FinancialTransaction, Contract, RecurringExpense } from '@/lib/types';
 import { Progress } from '@/components/ui/progress';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
-import { format, addMinutes, setHours, setMinutes, startOfDay } from 'date-fns';
-import { cn } from '@/lib/utils';
+import { format, addMinutes, setHours, setMinutes, startOfDay, startOfMonth, subMonths, endOfMonth } from 'date-fns';
+import { cn, formatCurrency } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger, DialogClose, DialogFooter } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -26,6 +26,7 @@ import { ptBR } from 'date-fns/locale';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { Badge } from '@/components/ui/badge';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 
 type AppointmentFormData = Omit<Appointment, 'id' | 'date'> & {
   id?: string;
@@ -40,10 +41,13 @@ export default function DashboardPage() {
   const [allTasks, setAllTasks] = useState<(Task & { projectName: string; clientId: string; projectId: string })[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [financials, setFinancials] = useState<FinancialTransaction[]>([]);
+  const [contracts, setContracts] = useState<Contract[]>([]);
+  const [recurringExpenses, setRecurringExpenses] = useState<RecurringExpense[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   
-  const [filters, setFilters] = useState({ responsible: '', deadline: null as Date | null });
+  const [filters, setFilters] = useState({ responsibleId: '', deadline: null as { from?: Date; to?: Date } | null });
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
   const [isAppointmentDialogOpen, setIsAppointmentDialogOpen] = useState(false);
   
@@ -54,9 +58,9 @@ export default function DashboardPage() {
     const unsubscribes: (() => void)[] = [];
     setIsLoading(true);
 
-    const subscribe = (col: string, setter: (data: any[]) => void) => {
+    const subscribe = (col: string, setter: (data: any[]) => void, queryFunc?: Function) => {
         const ref = collection(db, col);
-        const q = col === 'appointments' ? query(ref) : ref; // No specific query for others yet
+        const q = queryFunc ? queryFunc(ref) : ref;
         const unsubscribe = onSnapshot(q, (snapshot) => {
             setter(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
         });
@@ -79,6 +83,31 @@ export default function DashboardPage() {
         }));
     });
     unsubscribes.push(unsubscribeAppointments);
+    
+    const financialsQuery = query(collection(db, 'financials'));
+    const unsubscribeFinancials = onSnapshot(financialsQuery, (snapshot) => {
+        setFinancials(snapshot.docs.map(doc => {
+            const data = doc.data();
+            return {
+                id: doc.id,
+                ...data,
+                date: (data.date as Timestamp).toDate(),
+            } as FinancialTransaction;
+        }));
+    });
+    unsubscribes.push(unsubscribeFinancials);
+
+    const contractsQuery = query(collection(db, 'contracts'));
+    const unsubscribeContracts = onSnapshot(contractsQuery, (snapshot) => {
+        setContracts(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Contract)));
+    });
+    unsubscribes.push(unsubscribeContracts);
+
+    const recurringExpensesQuery = query(collection(db, 'recurring_expenses'));
+    const unsubscribeRecurringExpenses = onSnapshot(recurringExpensesQuery, (snapshot) => {
+        setRecurringExpenses(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as RecurringExpense)));
+    });
+    unsubscribes.push(unsubscribeRecurringExpenses);
 
 
     // Fetch all projects from all clients
@@ -194,12 +223,10 @@ export default function DashboardPage() {
 
     try {
         if (appointmentFormData.id) {
-            // Update existing
             const docRef = doc(db, 'appointments', appointmentFormData.id);
             await updateDoc(docRef, dataToSave);
             toast({ title: 'Compromisso Atualizado!', description: 'O compromisso foi salvo.' });
         } else {
-            // Create new
             await addDoc(collection(db, 'appointments'), dataToSave);
             toast({ title: 'Compromisso Adicionado!', description: 'O novo compromisso foi salvo.' });
         }
@@ -231,22 +258,19 @@ export default function DashboardPage() {
       return appointments.map(app => app.date);
   }, [appointments]);
 
-
-  const calculateProgress = (project: Project): number => {
-    const allTasks = project.sections?.flatMap(s => s.tasks || []) || [];
-    if (allTasks.length === 0) return 0;
-    const completedTasks = allTasks.filter(t => t.completed).length;
-    return Math.round((completedTasks / allTasks.length) * 100);
-  };
-  
   const filteredTasks = useMemo(() => {
-    let tasks = allTasks.filter(t => !t.completed); // Show only pending tasks
+    let tasks = allTasks.filter(t => !t.completed);
 
-    if (filters.responsible) {
-      tasks = tasks.filter(t => t.responsible === filters.responsible);
+    if (filters.responsibleId) {
+        tasks = tasks.filter(t => (t.responsibleIds || []).includes(filters.responsibleId));
     }
-    if (filters.deadline) {
-      tasks = tasks.filter(t => t.deadline && format(t.deadline.toDate(), 'yyyy-MM-dd') === format(filters.deadline, 'yyyy-MM-dd'));
+    if (filters.deadline?.from) {
+      const fromDate = startOfDay(filters.deadline.from);
+      tasks = tasks.filter(t => t.deadline && t.deadline.toDate() >= fromDate);
+    }
+    if (filters.deadline?.to) {
+        const toDate = startOfDay(filters.deadline.to);
+        tasks = tasks.filter(t => t.deadline && t.deadline.toDate() <= toDate);
     }
     // Sort by deadline, closer deadlines first
     return tasks.sort((a, b) => {
@@ -258,6 +282,16 @@ export default function DashboardPage() {
         return 0;
     });
   }, [allTasks, filters]);
+  
+  const { totalBalance, mrr, crr } = useMemo(() => {
+    const balance = financials.reduce((acc, t) => t.type === 'income' ? acc + t.amount : acc - t.amount, 0);
+    const monthlyRecurringRevenue = contracts.reduce((acc, c) => c.status === 'active' ? acc + c.amount : acc, 0);
+    const costRecurringRevenue = recurringExpenses.reduce((acc, e) => e.status === 'active' ? acc + e.amount : acc, 0);
+    return { totalBalance: balance, mrr: monthlyRecurringRevenue, crr: costRecurringRevenue };
+  }, [financials, contracts, recurringExpenses]);
+  
+  const activeContracts = useMemo(() => contracts.filter(c => c.status === 'active'), [contracts]);
+  const activeRecurringExpenses = useMemo(() => recurringExpenses.filter(e => e.status === 'active'), [recurringExpenses]);
 
 
   return (
@@ -267,7 +301,7 @@ export default function DashboardPage() {
         <p className="text-muted-foreground">Visão geral do seu negócio na Agência Digital.</p>
       </div>
       
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-5">
         <Dialog>
           <DialogTrigger asChild>
             <Card className="cursor-pointer hover:border-primary transition-colors">
@@ -277,23 +311,13 @@ export default function DashboardPage() {
               </CardHeader>
               <CardContent>
                 {isLoading ? <Skeleton className="h-8 w-1/4" /> : <div className="text-2xl font-bold">{clients.length}</div>}
-                <p className="text-xs text-muted-foreground">Clientes com projetos em andamento.</p>
               </CardContent>
             </Card>
           </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Clientes Ativos</DialogTitle>
-              <DialogDescription>Lista de todos os clientes ativos.</DialogDescription>
-            </DialogHeader>
+          <DialogContent><DialogHeader><DialogTitle>Clientes Ativos</DialogTitle></DialogHeader>
             <ScrollArea className="max-h-96">
                 {clients.map(client => (
-                    <Link key={client.id} href={`/clients/${client.id}`} passHref>
-                        <div className="flex items-center justify-between p-2 rounded-md hover:bg-secondary">
-                           <p className="font-medium">{client.name}</p>
-                           <ArrowRight className="h-4 w-4 text-muted-foreground" />
-                        </div>
-                    </Link>
+                    <Link key={client.id} href={`/clients/${client.id}`} passHref><div className="flex items-center justify-between p-2 rounded-md hover:bg-secondary"><p className="font-medium">{client.name}</p><ArrowRight className="h-4 w-4 text-muted-foreground" /></div></Link>
                 ))}
             </ScrollArea>
           </DialogContent>
@@ -303,28 +327,18 @@ export default function DashboardPage() {
           <DialogTrigger asChild>
             <Card className="cursor-pointer hover:border-primary transition-colors">
               <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium">Prospects em Andamento</CardTitle>
+                <CardTitle className="text-sm font-medium">Prospects</CardTitle>
                 <Briefcase className="w-4 h-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
                 {isLoading ? <Skeleton className="h-8 w-1/4" /> : <div className="text-2xl font-bold">{prospects.length}</div>}
-                <p className="text-xs text-muted-foreground">Leads no funil de vendas.</p>
               </CardContent>
             </Card>
            </DialogTrigger>
-           <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Prospects em Andamento</DialogTitle>
-              <DialogDescription>Lista de todos os prospects no funil.</DialogDescription>
-            </DialogHeader>
+           <DialogContent><DialogHeader><DialogTitle>Prospects em Andamento</DialogTitle></DialogHeader>
             <ScrollArea className="max-h-96">
                 {prospects.map(prospect => (
-                    <Link key={prospect.id} href="/prospects" passHref>
-                        <div className="flex items-center justify-between p-2 rounded-md hover:bg-secondary">
-                           <p className="font-medium">{prospect.name}</p>
-                           <p className="text-sm text-muted-foreground">{prospect.stage}</p>
-                        </div>
-                    </Link>
+                    <Link key={prospect.id} href="/prospects" passHref><div className="flex items-center justify-between p-2 rounded-md hover:bg-secondary"><p className="font-medium">{prospect.name}</p><p className="text-sm text-muted-foreground">{prospect.stage}</p></div></Link>
                 ))}
             </ScrollArea>
           </DialogContent>
@@ -333,38 +347,108 @@ export default function DashboardPage() {
         <Dialog>
             <DialogTrigger asChild>
                 <Card className="cursor-pointer hover:border-primary transition-colors">
-                  <CardHeader className="flex flex-row items-center justify-between pb-2">
-                    <CardTitle className="text-sm font-medium">Projetos Totais</CardTitle>
-                    <FolderKanban className="w-4 h-4 text-muted-foreground" />
-                  </CardHeader>
-                  <CardContent>
-                    {isLoading ? <Skeleton className="h-8 w-1/4" /> : <div className="text-2xl font-bold">{projects.length}</div>}
-                    <p className="text-xs text-muted-foreground">Gerenciando o sucesso dos clientes.</p>
-                  </CardContent>
+                  <CardHeader className="flex flex-row items-center justify-between pb-2"><CardTitle className="text-sm font-medium">Projetos</CardTitle><FolderKanban className="w-4 h-4 text-muted-foreground" /></CardHeader>
+                  <CardContent>{isLoading ? <Skeleton className="h-8 w-1/4" /> : <div className="text-2xl font-bold">{projects.length}</div>}</CardContent>
                 </Card>
             </DialogTrigger>
-             <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Projetos em Andamento</DialogTitle>
-                  <DialogDescription>Lista de todos os projetos em andamento.</DialogDescription>
-                </DialogHeader>
+             <DialogContent><DialogHeader><DialogTitle>Projetos em Andamento</DialogTitle></DialogHeader>
                 <ScrollArea className="max-h-96">
                     {projects.filter(p => p.status !== 'Concluído').map(project => (
                         <Link key={project.id} href={`/clients/${project.clientId}/projects/${project.id}`} passHref>
                              <div className="flex items-center justify-between p-2 rounded-md hover:bg-secondary">
-                               <div>
-                                   <p className="font-medium">{project.name}</p>
-                                   <p className="text-sm text-muted-foreground">{clients.find(c => c.id === project.clientId)?.name}</p>
-                               </div>
-                               <ArrowRight className="h-4 w-4 text-muted-foreground" />
+                               <div><p className="font-medium">{project.name}</p><p className="text-sm text-muted-foreground">{clients.find(c => c.id === project.clientId)?.name}</p></div><ArrowRight className="h-4 w-4 text-muted-foreground" />
                             </div>
                         </Link>
                     ))}
                 </ScrollArea>
               </DialogContent>
         </Dialog>
-      </div>
+        
+        <Dialog>
+            <DialogTrigger asChild>
+                <Card className="cursor-pointer hover:border-primary transition-colors">
+                    <CardHeader className="flex flex-row items-center justify-between pb-2"><CardTitle className="text-sm font-medium">Balanço Total</CardTitle><DollarSign className="h-4 w-4 text-muted-foreground" /></CardHeader>
+                    <CardContent>
+                        {isLoading ? <Skeleton className="h-8 w-1/2" /> : <div className={cn("text-2xl font-bold", totalBalance >= 0 ? "text-green-500" : "text-red-500")}>{formatCurrency(totalBalance)}</div>}
+                    </CardContent>
+                </Card>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-2xl">
+                <DialogHeader><DialogTitle>Extrato de Transações</DialogTitle></DialogHeader>
+                <ScrollArea className="max-h-96">
+                    <Table>
+                        <TableHeader><TableRow><TableHead>Descrição</TableHead><TableHead>Data</TableHead><TableHead className="text-right">Valor</TableHead></TableRow></TableHeader>
+                        <TableBody>
+                        {financials.map(t => (
+                            <TableRow key={t.id}>
+                                <TableCell>{t.description}</TableCell>
+                                <TableCell>{format(t.date, 'dd/MM/yyyy')}</TableCell>
+                                <TableCell className={cn("text-right font-semibold", t.type === 'income' ? 'text-green-400' : 'text-red-400')}>
+                                    {t.type === 'income' ? '+' : '-'} {formatCurrency(t.amount)}
+                                </TableCell>
+                            </TableRow>
+                        ))}
+                        </TableBody>
+                    </Table>
+                </ScrollArea>
+            </DialogContent>
+        </Dialog>
+        
+        <Dialog>
+            <DialogTrigger asChild>
+                <Card className="cursor-pointer hover:border-primary transition-colors">
+                    <CardHeader className="flex flex-row items-center justify-between pb-2"><CardTitle className="text-sm font-medium">MRR</CardTitle><RefreshCcw className="h-4 w-4 text-muted-foreground" /></CardHeader>
+                    <CardContent>
+                        {isLoading ? <Skeleton className="h-8 w-1/2" /> : <div className="text-2xl font-bold text-primary">{formatCurrency(mrr)}</div>}
+                    </CardContent>
+                </Card>
+            </DialogTrigger>
+             <DialogContent className="sm:max-w-lg">
+                <DialogHeader><DialogTitle>Contratos Ativos (MRR)</DialogTitle></DialogHeader>
+                <ScrollArea className="max-h-96">
+                     <Table>
+                        <TableHeader><TableRow><TableHead>Contrato</TableHead><TableHead className="text-right">Valor Mensal</TableHead></TableRow></TableHeader>
+                        <TableBody>
+                        {activeContracts.map(c => (
+                            <TableRow key={c.id}>
+                                <TableCell><div><p className="font-medium">{c.title}</p><p className="text-xs text-muted-foreground">{c.clientName}</p></div></TableCell>
+                                <TableCell className="text-right font-semibold text-primary">{formatCurrency(c.amount)}</TableCell>
+                            </TableRow>
+                        ))}
+                        </TableBody>
+                    </Table>
+                </ScrollArea>
+            </DialogContent>
+        </Dialog>
 
+        <Dialog>
+            <DialogTrigger asChild>
+                <Card className="cursor-pointer hover:border-primary transition-colors">
+                    <CardHeader className="flex flex-row items-center justify-between pb-2"><CardTitle className="text-sm font-medium">CRR</CardTitle><ShoppingCart className="h-4 w-4 text-muted-foreground" /></CardHeader>
+                    <CardContent>
+                        {isLoading ? <Skeleton className="h-8 w-1/2" /> : <div className="text-2xl font-bold text-destructive">{formatCurrency(crr)}</div>}
+                    </CardContent>
+                </Card>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-lg">
+                <DialogHeader><DialogTitle>Custos Recorrentes Ativos (CRR)</DialogTitle></DialogHeader>
+                <ScrollArea className="max-h-96">
+                     <Table>
+                        <TableHeader><TableRow><TableHead>Despesa</TableHead><TableHead className="text-right">Custo Mensal</TableHead></TableRow></TableHeader>
+                        <TableBody>
+                        {activeRecurringExpenses.map(e => (
+                            <TableRow key={e.id}>
+                                <TableCell><div><p className="font-medium">{e.description}</p><p className="text-xs text-muted-foreground">{e.category}</p></div></TableCell>
+                                <TableCell className="text-right font-semibold text-destructive">{formatCurrency(e.amount)}</TableCell>
+                            </TableRow>
+                        ))}
+                        </TableBody>
+                    </Table>
+                </ScrollArea>
+            </DialogContent>
+        </Dialog>
+      </div>
+      
        <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
           <Card className="col-span-1 md:col-span-2 lg:col-span-2">
               <CardHeader>
@@ -378,41 +462,27 @@ export default function DashboardPage() {
                           </PopoverTrigger>
                           <PopoverContent className="w-80">
                               <div className="grid gap-4">
-                                  <div className="space-y-2">
-                                      <h4 className="font-medium leading-none">Filtros de Tarefas</h4>
-                                      <p className="text-sm text-muted-foreground">
-                                          Filtre as tarefas por responsável ou prazo.
-                                      </p>
-                                  </div>
+                                  <div className="space-y-2"><h4 className="font-medium leading-none">Filtros de Tarefas</h4><p className="text-sm text-muted-foreground">Filtre as tarefas por responsável ou prazo.</p></div>
                                   <div className="grid gap-2">
-                                       <div className="grid grid-cols-3 items-center gap-4">
-                                            <Label htmlFor="responsible">Responsável</Label>
-                                            <Select onValueChange={(value) => setFilters(f => ({...f, responsible: value === 'all' ? '' : value}))} defaultValue={filters.responsible}>
-                                                <SelectTrigger id="responsible" className="col-span-2 h-8">
-                                                    <SelectValue placeholder="Selecione" />
-                                                </SelectTrigger>
-                                                <SelectContent>
-                                                    <SelectItem value="all">Todos</SelectItem>
-                                                    {users.map(user => (
-                                                        <SelectItem key={user.id} value={user.name}>{user.name}</SelectItem>
-                                                    ))}
-                                                </SelectContent>
+                                       <div className="grid grid-cols-3 items-center gap-4"><Label htmlFor="responsible">Responsável</Label>
+                                            <Select onValueChange={(value) => setFilters(f => ({...f, responsibleId: value === 'all' ? '' : value}))} defaultValue={filters.responsibleId}>
+                                                <SelectTrigger id="responsible" className="col-span-2 h-8"><SelectValue placeholder="Selecione" /></SelectTrigger>
+                                                <SelectContent><SelectItem value="all">Todos</SelectItem>{users.map(user => (<SelectItem key={user.id} value={user.id}>{user.name}</SelectItem>))}</SelectContent>
                                             </Select>
                                        </div>
-                                       <div className="grid grid-cols-3 items-center gap-4">
-                                            <Label htmlFor="deadline">Prazo</Label>
+                                       <div className="grid grid-cols-3 items-center gap-4"><Label htmlFor="deadline">Prazo</Label>
                                             <Popover>
                                                 <PopoverTrigger asChild>
-                                                    <Button variant={"outline"} className={cn("col-span-2 h-8 justify-start text-left font-normal", !filters.deadline && "text-muted-foreground")}>
+                                                    <Button id="deadline" variant={"outline"} className={cn("col-span-2 h-8 justify-start text-left font-normal", !filters.deadline && "text-muted-foreground")}>
                                                         <CalendarIconLucide className="mr-2 h-4 w-4" />
-                                                        {filters.deadline ? format(filters.deadline, "PPP") : <span>Escolha uma data</span>}
+                                                         {filters.deadline?.from ? (filters.deadline.to ? <>{format(filters.deadline.from, "LLL dd, y")} - {format(filters.deadline.to, "LLL dd, y")}</> : format(filters.deadline.from, "LLL dd, y")) : <span>Escolha um período</span>}
                                                     </Button>
                                                 </PopoverTrigger>
-                                                <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={filters.deadline as Date | undefined} onSelect={(date) => setFilters(f => ({...f, deadline: date || null}))} initialFocus /></PopoverContent>
+                                                <PopoverContent className="w-auto p-0" align="start"><Calendar mode="range" selected={filters.deadline as any} onSelect={(range) => setFilters(f => ({...f, deadline: range || null}))} numberOfMonths={2} /></PopoverContent>
                                             </Popover>
                                        </div>
                                   </div>
-                                   <Button variant="ghost" onClick={() => setFilters({ responsible: '', deadline: null })}>Limpar Filtros</Button>
+                                   <Button variant="ghost" onClick={() => setFilters({ responsibleId: '', deadline: null })}>Limpar Filtros</Button>
                               </div>
                           </PopoverContent>
                       </Popover>
@@ -425,17 +495,15 @@ export default function DashboardPage() {
                        filteredTasks.length > 0 ? filteredTasks.map(task => (
                            <Link key={task.id} href={`/clients/${task.clientId}/projects/${task.projectId}`} className="block">
                                <div className="flex items-center justify-between p-2 rounded-md hover:bg-secondary">
-                                   <div>
-                                       <p className="font-medium">{task.text}</p>
-                                       <p className="text-sm text-muted-foreground">{task.projectName}</p>
-                                   </div>
+                                   <div><p className="font-medium">{task.text}</p><p className="text-sm text-muted-foreground">{task.projectName}</p></div>
                                    <div className="text-right">
-                                       {task.responsible && <p className="text-sm font-semibold flex items-center gap-1"><UserIcon className="h-3 w-3" /> {task.responsible}</p>}
-                                       {task.deadline && (
-                                           <p className={cn("text-xs text-muted-foreground", new Date(task.deadline.toDate()) < new Date() && !task.completed ? 'text-red-400' : '')}>
-                                               Prazo: {format(task.deadline.toDate(), 'dd/MM/yyyy')}
-                                           </p>
-                                       )}
+                                       <div className="flex items-center justify-end gap-1">
+                                            {(task.responsibleIds || []).map(userId => {
+                                                const user = users.find(u => u.id === userId);
+                                                return user ? <Badge key={userId} variant="outline" className="flex items-center gap-1"><UserIcon size={12}/>{user.name.split(' ')[0]}</Badge> : null;
+                                            })}
+                                       </div>
+                                       {task.deadline && (<p className={cn("text-xs text-muted-foreground", new Date(task.deadline.toDate()) < new Date() && !task.completed ? 'text-red-400' : '')}>Prazo: {format(task.deadline.toDate(), 'dd/MM/yyyy')}</p>)}
                                    </div>
                                </div>
                            </Link>
@@ -448,8 +516,13 @@ export default function DashboardPage() {
            
           <Card className="col-span-1 md:col-span-2 lg:col-span-1">
             <CardHeader>
-                <CardTitle>Calendário de Compromissos</CardTitle>
-                 <CardDescription>Clique em uma data ou em um horário livre para adicionar um evento.</CardDescription>
+                <div className="flex justify-between items-center">
+                    <div>
+                        <CardTitle>Calendário</CardTitle>
+                        <CardDescription>Agenda de compromissos.</CardDescription>
+                    </div>
+                    <Button size="sm" onClick={() => handleOpenAppointmentDialog(null, selectedDate)}><PlusCircle className="mr-2 h-4 w-4"/>Adicionar</Button>
+                </div>
             </CardHeader>
             <CardContent>
                 <Calendar
@@ -499,81 +572,37 @@ export default function DashboardPage() {
             </DialogHeader>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <form onSubmit={handleSaveAppointment} className="space-y-4">
-                    <div>
-                        <Label htmlFor="title">Título do Compromisso</Label>
-                        <Input id="title" value={appointmentFormData.title} onChange={e => setAppointmentFormData(p => ({...p, title: e.target.value}))} required />
-                    </div>
-                    
+                    <div><Label htmlFor="title">Título do Compromisso</Label><Input id="title" value={appointmentFormData.title} onChange={e => setAppointmentFormData(p => ({...p, title: e.target.value}))} required /></div>
                     <div className="grid grid-cols-2 gap-4">
-                        <div>
-                             <Label>Horário de Início</Label>
-                             <Input type="text" readOnly value={appointmentFormData.date ? format(appointmentFormData.date, 'HH:mm') : "Selecione um horário"} className="bg-muted"/>
-                        </div>
-                        <div>
-                            <Label htmlFor="duration">Duração (min)</Label>
-                            <Select 
-                                value={String(appointmentFormData.duration)} 
-                                onValueChange={value => setAppointmentFormData(p => ({...p, duration: Number(value)}))}>
-                                <SelectTrigger>
-                                    <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="30">30 min</SelectItem>
-                                    <SelectItem value="60">60 min</SelectItem>
-                                    <SelectItem value="90">90 min</SelectItem>
-                                    <SelectItem value="120">120 min</SelectItem>
-                                </SelectContent>
+                        <div><Label>Horário de Início</Label><Input type="text" readOnly value={appointmentFormData.date ? format(appointmentFormData.date, 'HH:mm') : "Selecione um horário"} className="bg-muted"/></div>
+                        <div><Label htmlFor="duration">Duração (min)</Label>
+                            <Select value={String(appointmentFormData.duration)} onValueChange={value => setAppointmentFormData(p => ({...p, duration: Number(value)}))}>
+                                <SelectTrigger><SelectValue /></SelectTrigger>
+                                <SelectContent><SelectItem value="30">30 min</SelectItem><SelectItem value="60">60 min</SelectItem><SelectItem value="90">90 min</SelectItem><SelectItem value="120">120 min</SelectItem></SelectContent>
                             </Select>
                         </div>
                     </div>
-
-                    <div>
-                        <Label>Atribuir a</Label>
+                    <div><Label>Atribuir a</Label>
                         <Popover>
                             <PopoverTrigger asChild>
-                            <Button
-                                variant="outline"
-                                role="combobox"
-                                className="w-full justify-between"
-                            >
-                                {(appointmentFormData.userIds || []).length > 0
-                                ? `${(appointmentFormData.userIds || []).length} selecionado(s)`
-                                : "Selecione os membros..."}
+                            <Button variant="outline" role="combobox" className="w-full justify-between">
+                                {(appointmentFormData.userIds || []).length > 0 ? `${(appointmentFormData.userIds || []).length} selecionado(s)` : "Selecione os membros..."}
                                 <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                             </Button>
                             </PopoverTrigger>
-                            <PopoverContent className="w-full p-0">
-                            <Command>
-                                <CommandInput placeholder="Procurar membro..." />
-                                <CommandEmpty>Nenhum membro encontrado.</CommandEmpty>
-                                <CommandGroup>
-                                <CommandList>
+                            <PopoverContent className="w-full p-0"><Command><CommandInput placeholder="Procurar membro..." /><CommandEmpty>Nenhum membro encontrado.</CommandEmpty><CommandGroup><CommandList>
                                     {users.map((user) => (
-                                    <CommandItem
-                                        key={user.id}
-                                        onSelect={() => {
+                                    <CommandItem key={user.id} onSelect={() => {
                                         setAppointmentFormData(p => {
                                             const currentIds = p.userIds || [];
-                                            const newIds = currentIds.includes(user.id)
-                                            ? currentIds.filter(id => id !== user.id)
-                                            : [...currentIds, user.id];
+                                            const newIds = currentIds.includes(user.id) ? currentIds.filter(id => id !== user.id) : [...currentIds, user.id];
                                             return {...p, userIds: newIds};
                                         })
-                                        }}
-                                    >
-                                        <Check
-                                        className={cn(
-                                            "mr-2 h-4 w-4",
-                                            (appointmentFormData.userIds || []).includes(user.id) ? "opacity-100" : "opacity-0"
-                                        )}
-                                        />
+                                    }}>
+                                        <Check className={cn("mr-2 h-4 w-4", (appointmentFormData.userIds || []).includes(user.id) ? "opacity-100" : "opacity-0")}/>
                                         {user.name}
-                                    </CommandItem>
-                                    ))}
-                                </CommandList>
-                                </CommandGroup>
-                            </Command>
-                            </PopoverContent>
+                                    </CommandItem>))}
+                            </CommandList></CommandGroup></Command></PopoverContent>
                         </Popover>
                         <div className="pt-2 flex flex-wrap gap-1">
                             {(appointmentFormData.userIds || []).map(id => {
@@ -582,41 +611,19 @@ export default function DashboardPage() {
                             })}
                         </div>
                     </div>
-                     <div>
-                        <Label htmlFor="clientId">Cliente (Opcional)</Label>
+                     <div><Label htmlFor="clientId">Cliente (Opcional)</Label>
                         <Select value={appointmentFormData.clientId} onValueChange={value => setAppointmentFormData(p => ({...p, clientId: value === 'none' ? undefined : value}))}>
-                            <SelectTrigger id="clientId">
-                                <SelectValue placeholder="Selecione um cliente" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="none">Nenhum</SelectItem>
-                                {clients.map(client => (
-                                    <SelectItem key={client.id} value={client.id}>{client.name}</SelectItem>
-                                ))}
-                            </SelectContent>
+                            <SelectTrigger id="clientId"><SelectValue placeholder="Selecione um cliente" /></SelectTrigger>
+                            <SelectContent><SelectItem value="none">Nenhum</SelectItem>{clients.map(client => (<SelectItem key={client.id} value={client.id}>{client.name}</SelectItem>))}</SelectContent>
                         </Select>
                     </div>
-                     <div>
-                        <Label htmlFor="notes">Notas (Opcional)</Label>
-                        <Textarea id="notes" value={appointmentFormData.notes || ''} onChange={e => setAppointmentFormData(p => ({...p, notes: e.target.value}))} />
-                    </div>
+                     <div><Label htmlFor="notes">Notas (Opcional)</Label><Textarea id="notes" value={appointmentFormData.notes || ''} onChange={e => setAppointmentFormData(p => ({...p, notes: e.target.value}))} /></div>
                     <DialogFooter className="justify-between pt-4">
                          {appointmentFormData.id ? (
                             <AlertDialog>
-                                <AlertDialogTrigger asChild>
-                                    <Button type="button" variant="destructive"><Trash2 className="mr-2 h-4 w-4"/> Excluir</Button>
-                                </AlertDialogTrigger>
-                                <AlertDialogContent>
-                                    <AlertDialogHeader>
-                                        <AlertDialogTitle>Excluir compromisso?</AlertDialogTitle>
-                                        <AlertDialogDescription>
-                                            Esta ação não pode ser desfeita.
-                                        </AlertDialogDescription>
-                                    </AlertDialogHeader>
-                                    <AlertDialogFooter>
-                                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                        <AlertDialogAction onClick={() => handleDeleteAppointment(appointmentFormData.id)} className="bg-destructive hover:bg-destructive/90">Excluir</AlertDialogAction>
-                                    </AlertDialogFooter>
+                                <AlertDialogTrigger asChild><Button type="button" variant="destructive"><Trash2 className="mr-2 h-4 w-4"/> Excluir</Button></AlertDialogTrigger>
+                                <AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Excluir compromisso?</AlertDialogTitle><AlertDialogDescription>Esta ação não pode ser desfeita.</AlertDialogDescription></AlertDialogHeader>
+                                    <AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={() => handleDeleteAppointment(appointmentFormData.id)} className="bg-destructive hover:bg-destructive/90">Excluir</AlertDialogAction></AlertDialogFooter>
                                 </AlertDialogContent>
                             </AlertDialog>
                          ) : <div></div>}
@@ -638,8 +645,7 @@ export default function DashboardPage() {
                                     onClick={() => !slot.booked && setAppointmentFormData(p => ({...p, date: slot.time}))}
                                     disabled={slot.booked}
                                     className={cn(
-                                        "w-full p-2 rounded-md text-xs flex justify-between items-center",
-                                        "transition-colors",
+                                        "w-full p-2 rounded-md text-xs flex justify-between items-center transition-colors",
                                         slot.booked ? "bg-red-900/50 text-muted-foreground cursor-not-allowed" : "bg-secondary hover:bg-accent",
                                         appointmentFormData.date?.getTime() === slot.time.getTime() && !slot.booked && "ring-2 ring-primary bg-primary/20"
                                 )}>
@@ -656,5 +662,3 @@ export default function DashboardPage() {
     </div>
   );
 }
-
-    

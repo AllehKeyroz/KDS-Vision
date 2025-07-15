@@ -1,11 +1,12 @@
+
 'use client'
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { db } from '@/lib/firebase';
-import { collection, addDoc, onSnapshot, doc, updateDoc, deleteDoc } from 'firebase/firestore';
-import type { Client } from '@/lib/types';
+import { collection, addDoc, onSnapshot, doc, updateDoc, deleteDoc, writeBatch } from 'firebase/firestore';
+import type { Client, ProcessoTemplate } from '@/lib/types';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -31,10 +32,13 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { Checkbox } from '@/components/ui/checkbox';
 
 
 export default function ClientsPage() {
   const [clients, setClients] = useState<Client[]>([]);
+  const [processoTemplates, setProcessoTemplates] = useState<ProcessoTemplate[]>([]);
+  const [selectedProcessos, setSelectedProcessos] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
@@ -45,7 +49,7 @@ export default function ClientsPage() {
 
   useEffect(() => {
     setIsLoading(true);
-    const unsubscribe = onSnapshot(collection(db, "clients"), (querySnapshot) => {
+    const unsubscribeClients = onSnapshot(collection(db, "clients"), (querySnapshot) => {
       const clientsData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Client[];
       setClients(clientsData);
       setIsLoading(false);
@@ -58,8 +62,16 @@ export default function ClientsPage() {
       });
       setIsLoading(false);
     });
+    
+    const templatesCollectionRef = collection(db, 'agency', 'internal', 'processo_templates');
+    const unsubscribeTemplates = onSnapshot(templatesCollectionRef, (snapshot) => {
+        setProcessoTemplates(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ProcessoTemplate)));
+    });
 
-    return () => unsubscribe();
+    return () => {
+      unsubscribeClients();
+      unsubscribeTemplates();
+    };
   }, [toast]);
   
   const handleAddClient = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -68,7 +80,7 @@ export default function ClientsPage() {
     const form = event.currentTarget;
     const formData = new FormData(form);
     
-    const newClient: Omit<Client, 'id'> = {
+    const newClientData: Omit<Client, 'id'> = {
       name: formData.get('name') as string,
       contactPerson: formData.get('contactPerson') as string,
       contactEmail: formData.get('contactEmail') as string,
@@ -88,7 +100,7 @@ export default function ClientsPage() {
       additionalFields: {},
     };
 
-    if (!newClient.name || !newClient.contactPerson || !newClient.contactEmail) {
+    if (!newClientData.name || !newClientData.contactPerson || !newClientData.contactEmail) {
         toast({
             title: "Campos obrigatórios",
             description: "Nome, contato e email são obrigatórios.",
@@ -99,13 +111,33 @@ export default function ClientsPage() {
     }
 
     try {
-      await addDoc(collection(db, "clients"), newClient);
+      const clientDocRef = await addDoc(collection(db, "clients"), newClientData);
+      
+      // If there are selected processos, add them to the new client
+      if (selectedProcessos.length > 0) {
+          const batch = writeBatch(db);
+          selectedProcessos.forEach(templateId => {
+              const template = processoTemplates.find(t => t.id === templateId);
+              if (template) {
+                  const processoDocRef = doc(collection(db, 'clients', clientDocRef.id, 'processos'));
+                  batch.set(processoDocRef, {
+                      templateId: template.id,
+                      title: template.title,
+                      items: template.items.map(item => ({ ...item, completed: false })),
+                      createdAt: new Date(),
+                  });
+              }
+          });
+          await batch.commit();
+      }
+
       toast({
         title: "Cliente Adicionado!",
-        description: `O cliente ${newClient.name} foi adicionado com sucesso.`,
+        description: `O cliente ${newClientData.name} foi adicionado com sucesso.`,
       });
       setIsAddDialogOpen(false);
       form.reset();
+      setSelectedProcessos([]);
     } catch (error) {
       console.error("Error adding client: ", error);
       toast({
@@ -193,6 +225,28 @@ export default function ClientsPage() {
                 <Label htmlFor="whatsapp">WhatsApp</Label>
                 <Input id="whatsapp" name="whatsapp" placeholder="(99) 99999-9999" defaultValue={client?.whatsapp} />
             </div>
+            { !client && (
+                <div>
+                <h3 className="font-semibold text-lg pt-4">Processos Padrão</h3>
+                    <div className="p-2 border rounded-md max-h-48 overflow-y-auto space-y-2">
+                        {processoTemplates.length > 0 ? processoTemplates.map(template => (
+                             <div key={template.id} className="flex items-center space-x-2">
+                                <Checkbox 
+                                    id={`template-${template.id}`} 
+                                    onCheckedChange={(checked) => {
+                                        setSelectedProcessos(prev => 
+                                            checked ? [...prev, template.id] : prev.filter(id => id !== template.id)
+                                        )
+                                    }}
+                                />
+                                <label htmlFor={`template-${template.id}`} className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                                    {template.title}
+                                </label>
+                            </div>
+                        )) : <p className="text-sm text-muted-foreground">Nenhum template de processo criado.</p>}
+                    </div>
+                </div>
+            )}
         </div>
 
         <div className="space-y-4">
@@ -235,12 +289,12 @@ export default function ClientsPage() {
         <h1 className="text-3xl font-bold tracking-tight">Clientes Ativos</h1>
         <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
           <DialogTrigger asChild>
-            <Button variant="secondary" onClick={() => setIsAddDialogOpen(true)}>
+            <Button variant="secondary" onClick={() => { setIsAddDialogOpen(true); setSelectedProcessos([]); }}>
               <PlusCircle className="mr-2 h-4 w-4" />
               Adicionar Cliente
             </Button>
           </DialogTrigger>
-          <DialogContent className="sm:max-w-3xl">
+          <DialogContent className="sm:max-w-4xl">
             <DialogHeader>
               <DialogTitle>Adicionar Novo Cliente</DialogTitle>
               <DialogDescription>Preencha os campos abaixo para cadastrar um novo cliente.</DialogDescription>
@@ -339,7 +393,7 @@ export default function ClientsPage() {
       </Card>
 
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-          <DialogContent className="sm:max-w-3xl">
+          <DialogContent className="sm:max-w-4xl">
             <DialogHeader>
               <DialogTitle>Editar Cliente</DialogTitle>
               <DialogDescription>Atualize as informações do cliente abaixo.</DialogDescription>

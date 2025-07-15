@@ -20,6 +20,11 @@ import {
   type AdsIACreatorInput,
   type AdsIACreatorOutput,
 } from '@/ai/flows/ads-ia-creator';
+import { 
+    prospectScraper,
+    type ProspectScraperInput,
+    type ProspectScraperOutput,
+} from '@/ai/flows/prospect-scraper-flow';
 
 export async function runClientBrainstorming(input: ClientBrainstormingInput): Promise<ClientBrainstormingOutput> {
     return await clientBrainstorming(input);
@@ -35,4 +40,8 @@ export async function runSocialStrategist(input: SocialStrategistIAInput): Promi
 
 export async function runAdsCreator(input: AdsIACreatorInput): Promise<AdsIACreatorOutput> {
     return await adsIACreator(input);
+}
+
+export async function runProspectScraper(input: ProspectScraperInput): Promise<ProspectScraperOutput> {
+    return await prospectScraper(input);
 }

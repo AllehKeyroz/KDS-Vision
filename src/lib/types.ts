@@ -1,3 +1,4 @@
+
 import type { AdsIACreatorInput, AdsIACreatorOutput as AdsOutput } from "@/ai/flows/ads-ia-creator";
 import type { Timestamp } from "firebase/firestore";
 
@@ -59,12 +60,19 @@ export interface SocialSession {
   createdAt: any; // Firestore Timestamp
 }
 
+export interface LoggedTime {
+  userId: string;
+  hours: number;
+  date: Timestamp;
+}
+
 export interface Task {
   id: string;
   text: string;
-  responsible: string;
+  responsibleIds: string[];
   completed: boolean;
   deadline?: any; // Firestore Timestamp
+  timeLogs?: LoggedTime[]; // Detailed time tracking
 }
 
 export interface ProjectSection {
@@ -78,10 +86,11 @@ export interface Project {
   name: string;
   scope: string;
   value: number;
+  cost?: number; // Custo Estimado
   status: 'Planejamento' | 'Em Andamento' | 'Pausado' | 'Concluído';
   sections?: ProjectSection[];
   createdAt?: any;
-  clientId: string; // Add this line
+  clientId: string;
 }
 
 
@@ -99,6 +108,7 @@ export interface User {
   email: string;
   role: 'Admin' | 'Gestor' | 'Analista';
   avatar: string;
+  costPerHour?: number;
 }
 
 export interface FinancialTransaction {
@@ -109,6 +119,31 @@ export interface FinancialTransaction {
   date: any; // Firestore Timestamp
   category?: string;
   recurring: boolean;
+  // Fields for automated invoices from contracts
+  invoiceId?: string; // Unique ID for the invoice, e.g., `contractId_YYYY_MM`
+  contractId?: string;
+  recurringExpenseId?: string;
+  clientId?: string;
+}
+
+export interface Contract {
+    id: string;
+    clientId: string;
+    clientName: string;
+    title: string;
+    amount: number;
+    startDate: Timestamp;
+    status: 'active' | 'paused' | 'cancelled';
+    createdAt: Timestamp;
+}
+
+export interface RecurringExpense {
+  id: string;
+  description: string;
+  amount: number;
+  category: string;
+  startDate: Timestamp;
+  status: 'active' | 'paused' | 'cancelled';
 }
 
 export interface Appointment {
@@ -119,6 +154,25 @@ export interface Appointment {
   userIds: string[];
   clientId?: string;
   notes?: string;
+}
+
+export interface ProcessoItem {
+  text: string;
+  completed: boolean;
+}
+
+export interface ProcessoTemplate {
+  id: string;
+  title: string;
+  items: Omit<ProcessoItem, 'completed'>[];
+}
+
+export interface Processo {
+  id: string;
+  templateId: string;
+  title: string;
+  items: ProcessoItem[];
+  createdAt: Timestamp;
 }
 
 
