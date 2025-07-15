@@ -6,25 +6,107 @@ import { useParams } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { runAdsCreator } from '@/app/actions';
-import { CLIENT_CONTEXT_DATA } from '@/lib/data';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, Wand2, Newspaper, Target, Milestone, Wallet, Lightbulb, Bot, Image as ImageIcon, Save, Trash2, GalleryVerticalEnd } from 'lucide-react';
 import type { AdsCampaign, AdsIACreatorOutput } from '@/lib/types';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
-import { collection, addDoc, onSnapshot, serverTimestamp, doc, deleteDoc } from 'firebase/firestore';
+import { collection, addDoc, onSnapshot, serverTimestamp, doc, deleteDoc, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Skeleton } from '@/components/ui/skeleton';
+import type { Client } from '@/lib/types';
+
+
+function GeneratedCampaignContent({ result }: { result: AdsIACreatorOutput }) {
+    return (
+        <div className="space-y-6">
+             <Card className="animate-in fade-in-50 bg-secondary/30">
+                <CardHeader>
+                    <CardTitle className="font-headline flex items-center gap-2"><Bot /> Resumo Estratégico da IA</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                     <div className="flex flex-wrap gap-2">
+                        <Badge variant="secondary" className="flex items-center gap-2"><Wallet className="w-4 h-4"/> Orçamento Sugerido: {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(result.overallBudget.suggestion)}</Badge>
+                        <Badge variant="secondary" className="flex items-center gap-2"><Lightbulb className="w-4 h-4"/> Alocação: {result.overallBudget.allocation}</Badge>
+                    </div>
+                    <p className="text-sm text-muted-foreground">{result.summary}</p>
+                </CardContent>
+            </Card>
+
+            <Accordion type="multiple" className="w-full space-y-4">
+                {result.campaigns.map((campaign, campIndex) => (
+                     <Card key={campIndex} className="animate-in fade-in-50">
+                        <CardHeader>
+                             <CardTitle className="font-headline flex items-center gap-2 text-xl"><Milestone /> Campanha: {campaign.campaignName}</CardTitle>
+                             <CardDescription>Tipo de Campanha Sugerido: <Badge variant="outline">{campaign.campaignType}</Badge></CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            <Accordion type="multiple" className="w-full">
+                                {campaign.adSets.map((adSet, adSetIndex) => (
+                                    <AccordionItem value={`adset-${campIndex}-${adSetIndex}`} key={adSetIndex}>
+                                        <AccordionTrigger className="font-semibold text-base font-headline">
+                                            <div className="flex items-center gap-2"><Target className="w-5 h-5 text-primary"/>Conjunto: {adSet.adSetName}</div>
+                                        </AccordionTrigger>
+                                        <AccordionContent className="pl-6 space-y-4">
+                                            <p><span className="font-semibold">Plataformas Recomendadas:</span> {adSet.platforms}</p>
+                                            <p><span className="font-semibold">Direcionamento:</span> {adSet.targeting}</p>
+                                            <p><span className="font-semibold">Orçamento do Conjunto:</span> {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(adSet.budget)}</p>
+                                            <h4 className="font-semibold text-md mt-4">Criativos:</h4>
+                                            <Accordion type="multiple" className="w-full space-y-2">
+                                                {adSet.creatives.map((creative, cIndex) => (
+                                                    <AccordionItem value={`creative-${campIndex}-${adSetIndex}-${cIndex}`} key={cIndex} className="border p-3 rounded-lg bg-secondary/30">
+                                                        <AccordionTrigger className="text-sm font-semibold p-2">
+                                                            <div className="flex items-center gap-2"><Newspaper className="w-4 h-4" />{creative.creativeName}</div>
+                                                        </AccordionTrigger>
+                                                        <AccordionContent className="pt-4 px-2 space-y-3 text-xs">
+                                                            <div>
+                                                                <h6 className="font-bold">Títulos:</h6>
+                                                                <ul className="list-disc list-inside">
+                                                                    {creative.titles.map((t, i) => <li key={i} className="ml-4">{t}</li>)}
+                                                                </ul>
+                                                            </div>
+                                                             <div>
+                                                                <h6 className="font-bold">Descrições:</h6>
+                                                                <ul className="list-disc list-inside">
+                                                                    {creative.descriptions.map((d, i) => <li key={i} className="ml-4">{d}</li>)}
+                                                                </ul>
+                                                            </div>
+                                                             <div>
+                                                                <h6 className="font-bold">CTAs:</h6>
+                                                                <ul className="list-disc list-inside">
+                                                                    {creative.ctas.map((c, i) => <li key={i} className="ml-4">{c}</li>)}
+                                                                </ul>
+                                                            </div>
+                                                            <div>
+                                                                <h6 className="font-bold flex items-center gap-1"><ImageIcon className="w-4 h-4" /> Ideias de Imagem/Vídeo:</h6>
+                                                                <ul className="list-disc list-inside">
+                                                                    {creative.imageIdeas.map((idea, i) => <li key={i} className="ml-4">{idea}</li>)}
+                                                                </ul>
+                                                            </div>
+                                                        </AccordionContent>
+                                                    </AccordionItem>
+                                                ))}
+                                            </Accordion>
+                                        </AccordionContent>
+                                    </AccordionItem>
+                                ))}
+                            </Accordion>
+                        </CardContent>
+                    </Card>
+                ))}
+            </Accordion>
+        </div>
+    );
+}
 
 export default function AdsCreatorPage() {
     const params = useParams();
     const clientId = params.clientId as string;
     const { toast } = useToast();
     
+    const [client, setClient] = useState<Client | null>(null);
     const [formData, setFormData] = useState({
         productOrService: '',
         advertisingGoal: '',
@@ -39,22 +121,34 @@ export default function AdsCreatorPage() {
 
     const campaignsCollectionRef = useMemo(() => collection(db, 'clients', clientId, 'ad_campaigns'), [clientId]);
 
-    useEffect(() => {
+     useEffect(() => {
+        if (!clientId) return;
+
+        const fetchClient = async () => {
+            const docRef = doc(db, 'clients', clientId);
+            const docSnap = await getDoc(docRef);
+            if (docSnap.exists()) {
+                setClient({ id: docSnap.id, ...docSnap.data() } as Client);
+            }
+        };
+
         const unsubscribe = onSnapshot(campaignsCollectionRef, (snapshot) => {
             const campaignsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as AdsCampaign));
             setSavedCampaigns(campaignsData);
             setIsCampaignsLoading(false);
         });
-        return () => unsubscribe();
-    }, [campaignsCollectionRef]);
-    
-    // In a real app, this context would be fetched from Firestore. For now, we use the mock.
-    const clientContextData = CLIENT_CONTEXT_DATA[clientId] || {};
-    const clientContext = Object.entries(clientContextData)
-        .map(([key, value]) => `${key.toUpperCase()}: ${value}`)
-        .join('\n');
 
-    const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+        fetchClient();
+        return () => unsubscribe();
+    }, [clientId, campaignsCollectionRef]);
+
+    const getClientContext = () => {
+        if (!client) return "";
+        // This is a simplified context string. In a real app, you might fetch more detailed context.
+        return `Client Name: ${client.name}\nContact: ${client.contactPerson} (${client.contactEmail})`;
+    };
+
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const { id, value, type } = e.target;
         setFormData({ 
             ...formData, 
@@ -64,7 +158,6 @@ export default function AdsCreatorPage() {
 
     const handleGenerate = async (e: React.FormEvent) => {
         e.preventDefault();
-        // Basic validation
         if (!formData.productOrService || !formData.advertisingGoal) {
             toast({
                 title: 'Campos obrigatórios',
@@ -77,7 +170,7 @@ export default function AdsCreatorPage() {
         setGeneratedResult(null);
 
         try {
-            const response = await runAdsCreator({ clientContext, ...formData });
+            const response = await runAdsCreator({ clientContext: getClientContext(), ...formData });
             setGeneratedResult(response);
         } catch (error) {
             toast({
@@ -166,6 +259,13 @@ export default function AdsCreatorPage() {
                 </CardContent>
             </Card>
 
+            {isLoading && (
+                <div className="space-y-4">
+                    <Skeleton className="h-24 w-full" />
+                    <Skeleton className="h-48 w-full" />
+                </div>
+            )}
+
             {(generatedResult && !isLoading) && (
                 <Card>
                     <CardHeader className="flex flex-row justify-between items-start">
@@ -193,113 +293,29 @@ export default function AdsCreatorPage() {
                  <Accordion type="multiple" className="w-full space-y-4">
                      {savedCampaigns.map(campaign => (
                          <Card key={campaign.id}>
-                           <CardHeader className="flex flex-row justify-between items-start cursor-pointer">
-                                <div>
-                                    <CardTitle className="font-headline text-xl">{campaign.title}</CardTitle>
-                                    <CardDescription>Criado em: {new Date(campaign.createdAt?.toDate()).toLocaleDateString()}</CardDescription>
-                                </div>
-                                <Button variant="ghost" size="icon" onClick={() => handleDeleteCampaign(campaign.id)}>
-                                    <Trash2 className="h-4 w-4 text-destructive" />
-                                </Button>
-                            </CardHeader>
-                             <CardContent>
-                                <Accordion type="single" collapsible>
-                                    <AccordionItem value="item-1">
-                                        <AccordionTrigger>Mostrar Detalhes</AccordionTrigger>
-                                        <AccordionContent>
-                                            <GeneratedCampaignContent result={campaign.response} />
-                                        </AccordionContent>
-                                    </AccordionItem>
-                                </Accordion>
-                             </CardContent>
+                            <AccordionItem value={campaign.id} className="border-b-0">
+                               <CardHeader className="flex flex-row justify-between items-start cursor-pointer p-4">
+                                   <AccordionTrigger className="w-full text-left p-0">
+                                       <div>
+                                           <CardTitle className="font-headline text-xl">{campaign.title}</CardTitle>
+                                           <CardDescription>Criado em: {new Date(campaign.createdAt?.toDate()).toLocaleDateString()}</CardDescription>
+                                       </div>
+                                   </AccordionTrigger>
+                                   <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); handleDeleteCampaign(campaign.id); }}>
+                                       <Trash2 className="h-4 w-4 text-destructive" />
+                                   </Button>
+                               </CardHeader>
+                               <AccordionContent>
+                                   <div className="px-4 pb-4">
+                                     <GeneratedCampaignContent result={campaign.response} />
+                                   </div>
+                               </AccordionContent>
+                           </AccordionItem>
                          </Card>
                      ))}
                  </Accordion>
                 }
             </div>
-        </div>
-    );
-}
-
-
-function GeneratedCampaignContent({ result }: { result: AdsIACreatorOutput }) {
-    return (
-        <div className="space-y-6">
-             <Card className="animate-in fade-in-50 bg-secondary/30">
-                <CardHeader>
-                    <CardTitle className="font-headline flex items-center gap-2"><Bot /> Resumo Estratégico da IA</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                     <div className="flex flex-wrap gap-2">
-                        <Badge variant="secondary" className="flex items-center gap-2"><Wallet className="w-4 h-4"/> Orçamento Sugerido: {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(result.overallBudget.suggestion)}</Badge>
-                        <Badge variant="secondary" className="flex items-center gap-2"><Lightbulb className="w-4 h-4"/> Alocação: {result.overallBudget.allocation}</Badge>
-                    </div>
-                    <p className="text-sm text-muted-foreground">{result.summary}</p>
-                </CardContent>
-            </Card>
-
-            <Accordion type="multiple" className="w-full space-y-4">
-                {result.campaigns.map((campaign, campIndex) => (
-                     <Card key={campIndex} className="animate-in fade-in-50">
-                        <CardHeader>
-                             <CardTitle className="font-headline flex items-center gap-2 text-xl"><Milestone /> Campanha: {campaign.campaignName}</CardTitle>
-                             <CardDescription>Tipo de Campanha Sugerido: <Badge variant="outline">{campaign.campaignType}</Badge></CardDescription>
-                        </CardHeader>
-                        <CardContent>
-                            <Accordion type="multiple" className="w-full">
-                                {campaign.adSets.map((adSet, adSetIndex) => (
-                                    <AccordionItem value={`adset-${campIndex}-${adSetIndex}`} key={adSetIndex}>
-                                        <AccordionTrigger className="font-semibold text-base font-headline">
-                                            <div className="flex items-center gap-2"><Target className="w-5 h-5 text-primary"/>Conjunto: {adSet.adSetName}</div>
-                                        </AccordionTrigger>
-                                        <AccordionContent className="pl-6 space-y-4">
-                                            <p><span className="font-semibold">Plataformas Recomendadas:</span> {adSet.platforms}</p>
-                                            <p><span className="font-semibold">Direcionamento:</span> {adSet.targeting}</p>
-                                            <p><span className="font-semibold">Orçamento do Conjunto:</span> {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(adSet.budget)}</p>
-                                            <h4 className="font-semibold text-md mt-4">Criativos:</h4>
-                                            <Accordion type="multiple" className="w-full space-y-2">
-                                                {adSet.creatives.map((creative, cIndex) => (
-                                                    <AccordionItem value={`creative-${campIndex}-${adSetIndex}-${cIndex}`} key={cIndex} className="border p-3 rounded-lg bg-secondary/30">
-                                                        <AccordionTrigger className="text-sm font-semibold p-2">
-                                                            <div className="flex items-center gap-2"><Newspaper className="w-4 h-4" />{creative.creativeName}</div>
-                                                        </AccordionTrigger>
-                                                        <AccordionContent className="pt-4 px-2 space-y-3 text-xs">
-                                                            <div>
-                                                                <h6 className="font-bold">Títulos:</h6>
-                                                                <ul className="list-disc pl-5">
-                                                                    {creative.titles.map((t, i) => <li key={i}>{t}</li>)}
-                                                                </ul>
-                                                            </div>
-                                                             <div>
-                                                                <h6 className="font-bold">Descrições:</h6>
-                                                                <ul className="list-disc pl-5">
-                                                                    {creative.descriptions.map((d, i) => <li key={i}>{d}</li>)}
-                                                                </ul>
-                                                            </div>
-                                                             <div>
-                                                                <h6 className="font-bold">CTAs:</h6>
-                                                                <ul className="list-disc pl-5">
-                                                                    {creative.ctas.map((c, i) => <li key={i}>{c}</li>)}
-                                                                </ul>
-                                                            </div>
-                                                            <div>
-                                                                <h6 className="font-bold flex items-center gap-1"><ImageIcon className="w-4 h-4" /> Ideias de Imagem/Vídeo:</h6>
-                                                                <ul className="list-disc pl-5">
-                                                                    {creative.imageIdeas.map((idea, i) => <li key={i}>{idea}</li>)}
-                                                                </ul>
-                                                            </div>
-                                                        </AccordionContent>
-                                                    </AccordionItem>
-                                                ))}
-                                            </Accordion>
-                                        </AccordionContent>
-                                    </AccordionItem>
-                                ))}
-                            </Accordion>
-                        </CardContent>
-                    </Card>
-                ))}
-            </Accordion>
         </div>
     );
 }

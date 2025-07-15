@@ -6,7 +6,7 @@ import type { Client } from '@/lib/types';
 import { doc, getDoc } from 'firebase/firestore';
 import Link from 'next/link';
 import { usePathname, useParams } from 'next/navigation';
-import { Bot, FileText, KeyRound, Lightbulb, Megaphone, Share2, Wallet, Folder, CheckSquare, AlertTriangle, Wand2 } from 'lucide-react';
+import { Folder, Wand2, CheckSquare, AlertTriangle, KeyRound, FileText } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useEffect, useState } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';

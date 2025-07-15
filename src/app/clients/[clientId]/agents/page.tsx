@@ -1,7 +1,7 @@
 
 'use client'
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useParams } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
@@ -9,10 +9,12 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { runCreateAgent } from '@/app/actions';
-import { CLIENTS_DATA } from '@/lib/data';
 import { useToast } from '@/hooks/use-toast';
 import { Bot, Loader2, Save, PlusCircle, Trash2, Settings2 } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import type { Client } from '@/lib/types';
+import { doc, getDoc } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
 
 interface Tool {
     name: string;
@@ -24,6 +26,7 @@ export default function AgentsPage() {
     const clientId = params.clientId as string;
     const { toast } = useToast();
     
+    const [client, setClient] = useState<Client | null>(null);
     const [agentName, setAgentName] = useState('');
     const [agentDescription, setAgentDescription] = useState('');
     const [prompt, setPrompt] = useState('');
@@ -31,7 +34,19 @@ export default function AgentsPage() {
     const [resultMessage, setResultMessage] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     
-    const client = CLIENTS_DATA.find(c => c.id === clientId);
+    useEffect(() => {
+        if (!clientId) return;
+
+        const fetchClient = async () => {
+            const docRef = doc(db, 'clients', clientId);
+            const docSnap = await getDoc(docRef);
+            if (docSnap.exists()) {
+                setClient({ id: docSnap.id, ...docSnap.data() } as Client);
+            }
+        };
+
+        fetchClient();
+    }, [clientId]);
 
     const handleToolChange = (index: number, field: 'name' | 'description', value: string) => {
         const newTools = [...tools];

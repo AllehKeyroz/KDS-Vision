@@ -9,12 +9,11 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { runSocialStrategist } from '@/app/actions';
-import { CLIENT_CONTEXT_DATA } from '@/lib/data';
 import { useToast } from '@/hooks/use-toast';
 import { Lightbulb, Loader2, List, Wand2, Save, Trash2, Check, Pencil, X } from 'lucide-react';
 import type { SocialStrategistIAOutput } from '@/ai/flows/social-strategist-ia';
-import type { SocialSession } from '@/lib/types';
-import { collection, addDoc, onSnapshot, serverTimestamp, doc, updateDoc, deleteDoc } from 'firebase/firestore';
+import type { SocialSession, Client } from '@/lib/types';
+import { collection, addDoc, onSnapshot, serverTimestamp, doc, updateDoc, deleteDoc, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -24,6 +23,7 @@ export default function SocialStrategistPage() {
     const clientId = params.clientId as string;
     const { toast } = useToast();
     
+    const [client, setClient] = useState<Client | null>(null);
     const [formData, setFormData] = useState({
         desiredPlatforms: '',
         contentGoals: '',
@@ -39,18 +39,30 @@ export default function SocialStrategistPage() {
     const sessionsCollectionRef = useMemo(() => collection(db, 'clients', clientId, 'social_sessions'), [clientId]);
 
     useEffect(() => {
+        if (!clientId) return;
+
+        const fetchClient = async () => {
+            const docRef = doc(db, 'clients', clientId);
+            const docSnap = await getDoc(docRef);
+            if (docSnap.exists()) {
+                setClient({ id: docSnap.id, ...docSnap.data() } as Client);
+            }
+        };
+
         const unsubscribe = onSnapshot(sessionsCollectionRef, (snapshot) => {
             const sessionsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as SocialSession));
             setSessions(sessionsData.sort((a, b) => b.createdAt.toMillis() - a.createdAt.toMillis()));
             setIsSessionsLoading(false);
         });
-        return () => unsubscribe();
-    }, [sessionsCollectionRef]);
 
-    const clientContextData = CLIENT_CONTEXT_DATA[clientId] || {};
-    const clientContext = Object.entries(clientContextData)
-        .map(([key, value]) => `${key.toUpperCase()}: ${value}`)
-        .join('\n');
+        fetchClient();
+        return () => unsubscribe();
+    }, [clientId, sessionsCollectionRef]);
+
+    const getClientContext = () => {
+        if (!client) return "";
+        return `Client Name: ${client.name}\nContact: ${client.contactPerson} (${client.contactEmail})`;
+    };
 
     const handleGenerate = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -66,7 +78,7 @@ export default function SocialStrategistPage() {
         setGeneratedResult(null);
 
         try {
-            const response = await runSocialStrategist({ clientContext, ...formData });
+            const response = await runSocialStrategist({ clientContext: getClientContext(), ...formData });
             setGeneratedResult(response);
         } catch (error) {
             toast({
