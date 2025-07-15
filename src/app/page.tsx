@@ -3,9 +3,9 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Briefcase, Users, ArrowRight, FolderKanban, ListTodo, Filter, CalendarIcon as CalendarIconLucide, User as UserIcon, PlusCircle, CheckCircle2 } from 'lucide-react';
+import { Briefcase, Users, ArrowRight, FolderKanban, ListTodo, Filter, CalendarIcon as CalendarIconLucide, User as UserIcon, PlusCircle, CheckCircle2, Loader2 } from 'lucide-react';
 import { db } from '@/lib/firebase';
 import { collection, onSnapshot, query, where, Timestamp, addDoc, doc, updateDoc, deleteDoc } from 'firebase/firestore';
 import type { Client, Prospect, Project, Task, User, Appointment } from '@/lib/types';
@@ -432,7 +432,7 @@ export default function DashboardPage() {
                 <DialogFooter>
                     <DialogClose asChild><Button type="button" variant="outline">Cancelar</Button></DialogClose>
                     <Button type="submit" disabled={isSaving}>
-                        {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                        {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                         Salvar Compromisso
                     </Button>
                 </DialogFooter>
