@@ -5,7 +5,7 @@ import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Briefcase, Users, ArrowRight, FolderKanban, ListTodo, Filter, CalendarIcon as CalendarIconLucide, User as UserIcon, PlusCircle, CheckCircle2, Loader2, Check, ChevronsUpDown, Trash2, DollarSign, RefreshCcw, ArrowUp, ArrowDown } from 'lucide-react';
+import { Briefcase, Users, ArrowRight, FolderKanban, ListTodo, Filter, CalendarIcon as CalendarIconLucide, User as UserIcon, PlusCircle, CheckCircle2, Loader2, Check, ChevronsUpDown, Trash2, DollarSign, RefreshCcw } from 'lucide-react';
 import { db } from '@/lib/firebase';
 import { collection, onSnapshot, query, where, Timestamp, addDoc, doc, updateDoc, deleteDoc } from 'firebase/firestore';
 import type { Client, Prospect, Project, Task, User, Appointment, FinancialTransaction } from '@/lib/types';
@@ -269,38 +269,10 @@ export default function DashboardPage() {
     });
   }, [allTasks, filters]);
   
-  const { totalBalance, mrr, chartData } = useMemo(() => {
+  const { totalBalance, mrr } = useMemo(() => {
     const balance = financials.reduce((acc, t) => t.type === 'income' ? acc + t.amount : acc - t.amount, 0);
     const recurring = financials.reduce((acc, t) => (t.type === 'income' && t.recurring) ? acc + t.amount : acc, 0);
-
-    const monthlyData: { [key: string]: { income: number, expense: number } } = {};
-    const sixMonthsAgo = startOfMonth(subMonths(new Date(), 5));
-
-    financials.forEach(t => {
-      if (t.date >= sixMonthsAgo) {
-        const monthKey = format(t.date, 'yyyy-MM');
-        if (!monthlyData[monthKey]) {
-          monthlyData[monthKey] = { income: 0, expense: 0 };
-        }
-        if (t.type === 'income') {
-          monthlyData[monthKey].income += t.amount;
-        } else {
-          monthlyData[monthKey].expense += t.amount;
-        }
-      }
-    });
-
-    const finalChartData = Array.from({ length: 6 }).map((_, i) => {
-        const date = subMonths(new Date(), 5 - i);
-        const monthKey = format(date, 'yyyy-MM');
-        return {
-            name: format(date, 'MMM/yy', { locale: ptBR }),
-            Receita: monthlyData[monthKey]?.income || 0,
-            Despesa: monthlyData[monthKey]?.expense || 0,
-        };
-    });
-
-    return { totalBalance: balance, mrr: recurring, chartData: finalChartData };
+    return { totalBalance: balance, mrr: recurring };
   }, [financials]);
 
   return (
@@ -387,34 +359,6 @@ export default function DashboardPage() {
         </Card>
       </div>
       
-       <Card>
-          <CardHeader>
-            <CardTitle>Receita vs. Despesas (Últimos 6 Meses)</CardTitle>
-            <CardDescription>Acompanhe a saúde financeira da sua agência.</CardDescription>
-          </CardHeader>
-          <CardContent className="h-80">
-            {isLoading ? <Skeleton className="h-full w-full" /> : (
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={chartData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border) / 0.5)" />
-                <XAxis dataKey="name" stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} />
-                <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(value) => `R$${value}`} />
-                <Tooltip
-                  cursor={{ fill: 'hsl(var(--accent))' }}
-                  contentStyle={{
-                    backgroundColor: 'hsl(var(--background))',
-                    borderColor: 'hsl(var(--border))',
-                  }}
-                />
-                <Legend />
-                <Bar dataKey="Receita" fill="hsl(var(--chart-2))" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="Despesa" fill="hsl(var(--destructive))" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-            )}
-          </CardContent>
-        </Card>
-
        <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
           <Card className="col-span-1 md:col-span-2 lg:col-span-2">
               <CardHeader>
@@ -623,3 +567,5 @@ export default function DashboardPage() {
     </div>
   );
 }
+
+    

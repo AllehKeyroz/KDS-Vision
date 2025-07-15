@@ -14,11 +14,15 @@ import { useToast } from '@/hooks/use-toast';
 import { db } from '@/lib/firebase';
 import { collection, addDoc, onSnapshot, doc, updateDoc, deleteDoc, serverTimestamp, Timestamp } from 'firebase/firestore';
 import type { FinancialTransaction } from '@/lib/types';
-import { format } from 'date-fns';
+import { format, startOfMonth, subMonths } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import { Checkbox } from '@/components/ui/checkbox';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { Skeleton } from '@/components/ui/skeleton';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+
 
 const financialsCollectionRef = collection(db, 'financials');
 
@@ -102,16 +106,43 @@ export default function FinancialsPage() {
         }
     };
     
-    const totalBalance = useMemo(() => {
-        return transactions.reduce((acc, t) => {
+    const { totalBalance, mrr, chartData } = useMemo(() => {
+        const balance = transactions.reduce((acc, t) => {
             return t.type === 'income' ? acc + t.amount : acc - t.amount;
         }, 0);
-    }, [transactions]);
-    
-    const mrr = useMemo(() => {
-        return transactions.reduce((acc, t) => {
+        
+        const recurring = transactions.reduce((acc, t) => {
             return t.type === 'income' && t.recurring ? acc + t.amount : acc;
         }, 0);
+        
+        const monthlyData: { [key: string]: { income: number, expense: number } } = {};
+        const sixMonthsAgo = startOfMonth(subMonths(new Date(), 5));
+
+        transactions.forEach(t => {
+          if (t.date >= sixMonthsAgo) {
+            const monthKey = format(t.date, 'yyyy-MM');
+            if (!monthlyData[monthKey]) {
+              monthlyData[monthKey] = { income: 0, expense: 0 };
+            }
+            if (t.type === 'income') {
+              monthlyData[monthKey].income += t.amount;
+            } else {
+              monthlyData[monthKey].expense += t.amount;
+            }
+          }
+        });
+
+        const finalChartData = Array.from({ length: 6 }).map((_, i) => {
+            const date = subMonths(new Date(), 5 - i);
+            const monthKey = format(date, 'yyyy-MM');
+            return {
+                name: format(date, 'MMM/yy', { locale: ptBR }),
+                Receita: monthlyData[monthKey]?.income || 0,
+                Despesa: monthlyData[monthKey]?.expense || 0,
+            };
+        });
+
+        return { totalBalance: balance, mrr: recurring, chartData: finalChartData };
     }, [transactions]);
 
 
@@ -148,6 +179,34 @@ export default function FinancialsPage() {
                     </CardContent>
                 </Card>
             </div>
+
+            <Card>
+                <CardHeader>
+                    <CardTitle>Receita vs. Despesas (Últimos 6 Meses)</CardTitle>
+                    <CardDescription>Acompanhe a saúde financeira da sua agência.</CardDescription>
+                </CardHeader>
+                <CardContent className="h-80">
+                    {isLoading ? <Skeleton className="h-full w-full" /> : (
+                    <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={chartData}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border) / 0.5)" />
+                        <XAxis dataKey="name" stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} />
+                        <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(value) => `R$${value}`} />
+                        <Tooltip
+                        cursor={{ fill: 'hsl(var(--accent))' }}
+                        contentStyle={{
+                            backgroundColor: 'hsl(var(--background))',
+                            borderColor: 'hsl(var(--border))',
+                        }}
+                        />
+                        <Legend />
+                        <Bar dataKey="Receita" fill="hsl(var(--chart-2))" radius={[4, 4, 0, 0]} />
+                        <Bar dataKey="Despesa" fill="hsl(var(--destructive))" radius={[4, 4, 0, 0]} />
+                    </BarChart>
+                    </ResponsiveContainer>
+                    )}
+                </CardContent>
+            </Card>
 
             <Card>
                  <CardHeader>
@@ -265,3 +324,5 @@ export default function FinancialsPage() {
         </div>
     );
 }
+
+    
