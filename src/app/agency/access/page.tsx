@@ -24,10 +24,12 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 
+// Define the collection reference outside the component to prevent re-creation on re-renders
+const agencyAccessCollectionRef = collection(db, 'agency', 'internal', 'access');
+
 // Note: Using ClientAccess type for simplicity, as the structure is identical.
 export default function AgencyAccessPage() {
     const { toast } = useToast();
-    const agencyAccessCollectionRef = collection(db, 'agency', 'internal', 'access');
 
     const [accessList, setAccessList] = useState<ClientAccess[]>([]);
     const [isLoading, setIsLoading] = useState(true);
@@ -51,7 +53,7 @@ export default function AgencyAccessPage() {
         });
 
         return () => unsubscribe();
-    }, [agencyAccessCollectionRef, toast]);
+    }, [toast]);
 
     const handleCopy = (text: string, fieldName: string) => {
         if (!text) {
