@@ -26,14 +26,14 @@ export default function AgencyLayout({ children }: { children: React.ReactNode }
       </div>
       
       <div className="border-b border-white/10">
-        <div className="flex gap-2 sm:gap-8 px-0 sm:px-4 overflow-x-auto">
+        <div className="flex gap-2 sm:gap-4 px-0 sm:px-2 overflow-x-auto">
           {tabs.map((tab, index) => {
             const isActive = pathname.startsWith(tab.href);
             return (
               <Link href={tab.href} key={tab.name} passHref>
                 <div 
                   className={cn(
-                    "flex items-center gap-2 pb-3 pt-4 text-sm font-bold tracking-wide border-b-[3px] transition-all duration-300 ease-in-out whitespace-nowrap px-4",
+                    "flex items-center gap-2 pb-3 pt-4 text-sm font-bold tracking-wide border-b-[3px] transition-all duration-300 ease-in-out whitespace-nowrap px-3",
                     isActive ? "border-primary text-primary glow-primary" : "border-transparent text-muted-foreground hover:text-foreground hover:border-primary/50"
                   )}
                 >

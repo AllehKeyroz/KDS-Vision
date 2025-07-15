@@ -54,7 +54,7 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
       <div className="space-y-6">
         <Skeleton className="h-9 w-1/2" />
         <div className="border-b border-white/10">
-          <div className="flex gap-2 sm:gap-8 px-0 sm:px-4 overflow-x-auto">
+          <div className="flex gap-2 sm:gap-4 px-0 sm:px-2 overflow-x-auto">
             {tabs.map((tab) => (
               <Skeleton key={tab.name} className="h-12 w-24" />
             ))}
@@ -82,14 +82,14 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
       </div>
       
       <div className="border-b border-white/10 animate-in fade-in-25 slide-in-from-bottom-4 duration-500 delay-100">
-        <div className="flex gap-2 sm:gap-8 px-0 sm:px-4 overflow-x-auto">
+        <div className="flex gap-2 sm:gap-4 px-0 sm:px-2 overflow-x-auto">
           {tabs.map((tab, index) => {
             const isActive = tab.href === '' ? pathname === basePath : pathname.startsWith(basePath + tab.href);
             return (
               <Link href={`${basePath}${tab.href}`} key={tab.name} passHref>
                 <div 
                   className={cn(
-                    "flex items-center gap-2 pb-3 pt-4 text-sm font-bold tracking-wide border-b-[3px] transition-all duration-300 ease-in-out whitespace-nowrap px-4",
+                    "flex items-center gap-2 pb-3 pt-4 text-sm font-bold tracking-wide border-b-[3px] transition-all duration-300 ease-in-out whitespace-nowrap px-3",
                     isActive ? "border-primary text-primary glow-primary" : "border-transparent text-muted-foreground hover:text-foreground hover:border-primary/50"
                   )}
                   style={{ animationDelay: `${150 + index * 50}ms` }}
