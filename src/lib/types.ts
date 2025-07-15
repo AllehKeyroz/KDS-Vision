@@ -1,3 +1,4 @@
+
 import type { AdsIACreatorInput, AdsIACreatorOutput as AdsOutput } from "@/ai/flows/ads-ia-creator";
 import type { Timestamp } from "firebase/firestore";
 
@@ -153,6 +154,25 @@ export interface Appointment {
   userIds: string[];
   clientId?: string;
   notes?: string;
+}
+
+export interface PlaybookItem {
+  text: string;
+  completed: boolean;
+}
+
+export interface PlaybookTemplate {
+  id: string;
+  title: string;
+  items: Omit<PlaybookItem, 'completed'>[];
+}
+
+export interface Playbook {
+  id: string;
+  templateId: string;
+  title: string;
+  items: PlaybookItem[];
+  createdAt: Timestamp;
 }
 
 
