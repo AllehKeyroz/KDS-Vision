@@ -5,7 +5,7 @@ import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Briefcase, Users, ArrowRight, FolderKanban, ListTodo, Filter, CalendarIcon as CalendarIconLucide, User as UserIcon, PlusCircle, CheckCircle2, Loader2, Check, ChevronsUpDown, Trash2, DollarSign, RefreshCcw, ShoppingCart } from 'lucide-react';
+import { Briefcase, Users, ArrowRight, FolderKanban, ListTodo, Filter, CalendarIcon as CalendarIconLucide, User as UserIcon, PlusCircle, CheckCircle2, Loader2, Check, ChevronsUpDown, Trash2, DollarSign, RefreshCcw, ShoppingCart, ArrowUpCircle, ArrowDownCircle } from 'lucide-react';
 import { db } from '@/lib/firebase';
 import { collection, onSnapshot, query, where, Timestamp, addDoc, doc, updateDoc, deleteDoc } from 'firebase/firestore';
 import type { Client, Prospect, Project, Task, User, Appointment, FinancialTransaction, Contract, RecurringExpense } from '@/lib/types';
@@ -26,7 +26,7 @@ import { ptBR } from 'date-fns/locale';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { Badge } from '@/components/ui/badge';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 
 type AppointmentFormData = Omit<Appointment, 'id' | 'date'> & {
   id?: string;
@@ -47,7 +47,7 @@ export default function DashboardPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   
-  const [filters, setFilters] = useState({ responsible: '', deadline: null as { from?: Date; to?: Date } | null });
+  const [filters, setFilters] = useState({ responsibleId: '', deadline: null as { from?: Date; to?: Date } | null });
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
   const [isAppointmentDialogOpen, setIsAppointmentDialogOpen] = useState(false);
   
@@ -259,10 +259,10 @@ export default function DashboardPage() {
   }, [appointments]);
 
   const filteredTasks = useMemo(() => {
-    let tasks = allTasks.filter(t => !t.completed); // Show only pending tasks
+    let tasks = allTasks.filter(t => !t.completed);
 
-    if (filters.responsible) {
-      tasks = tasks.filter(t => t.responsible === filters.responsible);
+    if (filters.responsibleId) {
+        tasks = tasks.filter(t => (t.responsibleIds || []).includes(filters.responsibleId));
     }
     if (filters.deadline?.from) {
       const fromDate = startOfDay(filters.deadline.from);
@@ -289,6 +289,10 @@ export default function DashboardPage() {
     const costRecurringRevenue = recurringExpenses.reduce((acc, e) => e.status === 'active' ? acc + e.amount : acc, 0);
     return { totalBalance: balance, mrr: monthlyRecurringRevenue, crr: costRecurringRevenue };
   }, [financials, contracts, recurringExpenses]);
+  
+  const activeContracts = useMemo(() => contracts.filter(c => c.status === 'active'), [contracts]);
+  const activeRecurringExpenses = useMemo(() => recurringExpenses.filter(e => e.status === 'active'), [recurringExpenses]);
+
 
   return (
     <div className="space-y-8">
@@ -360,24 +364,89 @@ export default function DashboardPage() {
               </DialogContent>
         </Dialog>
         
-        <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2"><CardTitle className="text-sm font-medium">Balanço Total</CardTitle><DollarSign className="h-4 w-4 text-muted-foreground" /></CardHeader>
-            <CardContent>
-                 {isLoading ? <Skeleton className="h-8 w-1/2" /> : <div className={cn("text-2xl font-bold", totalBalance >= 0 ? "text-green-500" : "text-red-500")}>{formatCurrency(totalBalance)}</div>}
-            </CardContent>
-        </Card>
-         <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2"><CardTitle className="text-sm font-medium">MRR</CardTitle><RefreshCcw className="h-4 w-4 text-muted-foreground" /></CardHeader>
-            <CardContent>
-                {isLoading ? <Skeleton className="h-8 w-1/2" /> : <div className="text-2xl font-bold text-primary">{formatCurrency(mrr)}</div>}
-            </CardContent>
-        </Card>
-         <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2"><CardTitle className="text-sm font-medium">CRR</CardTitle><ShoppingCart className="h-4 w-4 text-muted-foreground" /></CardHeader>
-            <CardContent>
-                {isLoading ? <Skeleton className="h-8 w-1/2" /> : <div className="text-2xl font-bold text-destructive">{formatCurrency(crr)}</div>}
-            </CardContent>
-        </Card>
+        <Dialog>
+            <DialogTrigger asChild>
+                <Card className="cursor-pointer hover:border-primary transition-colors">
+                    <CardHeader className="flex flex-row items-center justify-between pb-2"><CardTitle className="text-sm font-medium">Balanço Total</CardTitle><DollarSign className="h-4 w-4 text-muted-foreground" /></CardHeader>
+                    <CardContent>
+                        {isLoading ? <Skeleton className="h-8 w-1/2" /> : <div className={cn("text-2xl font-bold", totalBalance >= 0 ? "text-green-500" : "text-red-500")}>{formatCurrency(totalBalance)}</div>}
+                    </CardContent>
+                </Card>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-2xl">
+                <DialogHeader><DialogTitle>Extrato de Transações</DialogTitle></DialogHeader>
+                <ScrollArea className="max-h-96">
+                    <Table>
+                        <TableHeader><TableRow><TableHead>Descrição</TableHead><TableHead>Data</TableHead><TableHead className="text-right">Valor</TableHead></TableRow></TableHeader>
+                        <TableBody>
+                        {financials.map(t => (
+                            <TableRow key={t.id}>
+                                <TableCell>{t.description}</TableCell>
+                                <TableCell>{format(t.date, 'dd/MM/yyyy')}</TableCell>
+                                <TableCell className={cn("text-right font-semibold", t.type === 'income' ? 'text-green-400' : 'text-red-400')}>
+                                    {t.type === 'income' ? '+' : '-'} {formatCurrency(t.amount)}
+                                </TableCell>
+                            </TableRow>
+                        ))}
+                        </TableBody>
+                    </Table>
+                </ScrollArea>
+            </DialogContent>
+        </Dialog>
+        
+        <Dialog>
+            <DialogTrigger asChild>
+                <Card className="cursor-pointer hover:border-primary transition-colors">
+                    <CardHeader className="flex flex-row items-center justify-between pb-2"><CardTitle className="text-sm font-medium">MRR</CardTitle><RefreshCcw className="h-4 w-4 text-muted-foreground" /></CardHeader>
+                    <CardContent>
+                        {isLoading ? <Skeleton className="h-8 w-1/2" /> : <div className="text-2xl font-bold text-primary">{formatCurrency(mrr)}</div>}
+                    </CardContent>
+                </Card>
+            </DialogTrigger>
+             <DialogContent className="sm:max-w-lg">
+                <DialogHeader><DialogTitle>Contratos Ativos (MRR)</DialogTitle></DialogHeader>
+                <ScrollArea className="max-h-96">
+                     <Table>
+                        <TableHeader><TableRow><TableHead>Contrato</TableHead><TableHead className="text-right">Valor Mensal</TableHead></TableRow></TableHeader>
+                        <TableBody>
+                        {activeContracts.map(c => (
+                            <TableRow key={c.id}>
+                                <TableCell><div><p className="font-medium">{c.title}</p><p className="text-xs text-muted-foreground">{c.clientName}</p></div></TableCell>
+                                <TableCell className="text-right font-semibold text-primary">{formatCurrency(c.amount)}</TableCell>
+                            </TableRow>
+                        ))}
+                        </TableBody>
+                    </Table>
+                </ScrollArea>
+            </DialogContent>
+        </Dialog>
+
+        <Dialog>
+            <DialogTrigger asChild>
+                <Card className="cursor-pointer hover:border-primary transition-colors">
+                    <CardHeader className="flex flex-row items-center justify-between pb-2"><CardTitle className="text-sm font-medium">CRR</CardTitle><ShoppingCart className="h-4 w-4 text-muted-foreground" /></CardHeader>
+                    <CardContent>
+                        {isLoading ? <Skeleton className="h-8 w-1/2" /> : <div className="text-2xl font-bold text-destructive">{formatCurrency(crr)}</div>}
+                    </CardContent>
+                </Card>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-lg">
+                <DialogHeader><DialogTitle>Custos Recorrentes Ativos (CRR)</DialogTitle></DialogHeader>
+                <ScrollArea className="max-h-96">
+                     <Table>
+                        <TableHeader><TableRow><TableHead>Despesa</TableHead><TableHead className="text-right">Custo Mensal</TableHead></TableRow></TableHeader>
+                        <TableBody>
+                        {activeRecurringExpenses.map(e => (
+                            <TableRow key={e.id}>
+                                <TableCell><div><p className="font-medium">{e.description}</p><p className="text-xs text-muted-foreground">{e.category}</p></div></TableCell>
+                                <TableCell className="text-right font-semibold text-destructive">{formatCurrency(e.amount)}</TableCell>
+                            </TableRow>
+                        ))}
+                        </TableBody>
+                    </Table>
+                </ScrollArea>
+            </DialogContent>
+        </Dialog>
       </div>
       
        <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
@@ -396,9 +465,9 @@ export default function DashboardPage() {
                                   <div className="space-y-2"><h4 className="font-medium leading-none">Filtros de Tarefas</h4><p className="text-sm text-muted-foreground">Filtre as tarefas por responsável ou prazo.</p></div>
                                   <div className="grid gap-2">
                                        <div className="grid grid-cols-3 items-center gap-4"><Label htmlFor="responsible">Responsável</Label>
-                                            <Select onValueChange={(value) => setFilters(f => ({...f, responsible: value === 'all' ? '' : value}))} defaultValue={filters.responsible}>
+                                            <Select onValueChange={(value) => setFilters(f => ({...f, responsibleId: value === 'all' ? '' : value}))} defaultValue={filters.responsibleId}>
                                                 <SelectTrigger id="responsible" className="col-span-2 h-8"><SelectValue placeholder="Selecione" /></SelectTrigger>
-                                                <SelectContent><SelectItem value="all">Todos</SelectItem>{users.map(user => (<SelectItem key={user.id} value={user.name}>{user.name}</SelectItem>))}</SelectContent>
+                                                <SelectContent><SelectItem value="all">Todos</SelectItem>{users.map(user => (<SelectItem key={user.id} value={user.id}>{user.name}</SelectItem>))}</SelectContent>
                                             </Select>
                                        </div>
                                        <div className="grid grid-cols-3 items-center gap-4"><Label htmlFor="deadline">Prazo</Label>
@@ -413,7 +482,7 @@ export default function DashboardPage() {
                                             </Popover>
                                        </div>
                                   </div>
-                                   <Button variant="ghost" onClick={() => setFilters({ responsible: '', deadline: null })}>Limpar Filtros</Button>
+                                   <Button variant="ghost" onClick={() => setFilters({ responsibleId: '', deadline: null })}>Limpar Filtros</Button>
                               </div>
                           </PopoverContent>
                       </Popover>
@@ -428,7 +497,12 @@ export default function DashboardPage() {
                                <div className="flex items-center justify-between p-2 rounded-md hover:bg-secondary">
                                    <div><p className="font-medium">{task.text}</p><p className="text-sm text-muted-foreground">{task.projectName}</p></div>
                                    <div className="text-right">
-                                       {task.responsible && <p className="text-sm font-semibold flex items-center gap-1"><UserIcon className="h-3 w-3" /> {task.responsible}</p>}
+                                       <div className="flex items-center justify-end gap-1">
+                                            {(task.responsibleIds || []).map(userId => {
+                                                const user = users.find(u => u.id === userId);
+                                                return user ? <Badge key={userId} variant="outline" className="flex items-center gap-1"><UserIcon size={12}/>{user.name.split(' ')[0]}</Badge> : null;
+                                            })}
+                                       </div>
                                        {task.deadline && (<p className={cn("text-xs text-muted-foreground", new Date(task.deadline.toDate()) < new Date() && !task.completed ? 'text-red-400' : '')}>Prazo: {format(task.deadline.toDate(), 'dd/MM/yyyy')}</p>)}
                                    </div>
                                </div>

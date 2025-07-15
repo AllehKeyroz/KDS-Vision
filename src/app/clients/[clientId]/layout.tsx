@@ -11,13 +11,13 @@ import { useEffect, useState } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
 
 const tabs = [
-  { name: 'Contexto', href: '', icon: FileText },
-  { name: 'Acessos', href: '/access', icon: KeyRound },
   { name: 'Projetos', href: '/projects', icon: Folder },
+  { name: 'Ads Creator', href: '/ads', icon: Megaphone },
+  { name: 'Social', href: '/social', icon: Share2 },
   { name: 'Brainstorm IA', href: '/brainstorming', icon: Lightbulb },
   { name: 'Agentes IA', href: '/agents', icon: Bot },
-  { name: 'Social', href: '/social', icon: Share2 },
-  { name: 'Ads Creator', href: '/ads', icon: Megaphone },
+  { name: 'Acessos', href: '/access', icon: KeyRound },
+  { name: 'Contexto', href: '', icon: FileText },
 ];
 
 export default function ClientLayout({ children }: { children: React.ReactNode }) {
@@ -83,7 +83,7 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
       <div className="border-b border-white/10 animate-in fade-in-25 slide-in-from-bottom-4 duration-500 delay-100">
         <div className="flex gap-2 sm:gap-8 px-0 sm:px-4 overflow-x-auto">
           {tabs.map((tab, index) => {
-            const isActive = tab.href === currentPathSegment || (currentPathSegment.startsWith(tab.href) && tab.href !== '');
+            const isActive = tab.href === '' ? pathname === basePath : pathname.startsWith(basePath + tab.href);
             return (
               <Link href={`${basePath}${tab.href}`} key={tab.name} passHref>
                 <div 

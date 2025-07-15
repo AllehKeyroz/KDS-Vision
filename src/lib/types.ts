@@ -68,7 +68,7 @@ export interface LoggedTime {
 export interface Task {
   id: string;
   text: string;
-  responsible: string;
+  responsibleIds: string[];
   completed: boolean;
   deadline?: any; // Firestore Timestamp
   timeLogs?: LoggedTime[]; // Detailed time tracking

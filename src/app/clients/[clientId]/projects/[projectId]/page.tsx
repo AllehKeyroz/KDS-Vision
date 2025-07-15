@@ -11,7 +11,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Progress } from '@/components/ui/progress';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
-import { PlusCircle, Loader2, Trash2, GripVertical, Check, X, Pencil, CheckCircle2, ArrowLeft, CalendarIcon, Filter, User, Clock, DollarSign, BarChart2 } from 'lucide-react';
+import { PlusCircle, Loader2, Trash2, GripVertical, Check, X, Pencil, CheckCircle2, ArrowLeft, CalendarIcon, Filter, User, Clock, DollarSign, BarChart2, ChevronsUpDown } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { db } from '@/lib/firebase';
 import { collection, onSnapshot, doc, updateDoc, arrayUnion, arrayRemove, getDoc, Timestamp } from 'firebase/firestore';
@@ -32,6 +32,8 @@ import {
 import { Dialog, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogContent, DialogClose } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
+
 
 export default function ProjectDetailPage() {
     const params = useParams();
@@ -42,12 +44,12 @@ export default function ProjectDetailPage() {
     const [project, setProject] = useState<Project | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [newSectionTitle, setNewSectionTitle] = useState("");
-    const [newTask, setNewTask] = useState<{ [key: string]: { text: string; responsible: string, deadline?: Date } }>({});
+    const [newTask, setNewTask] = useState<{ [key: string]: { text: string; responsibleIds: string[], deadline?: Date } }>({});
     const [editingItemId, setEditingItemId] = useState<string | null>(null);
     const [editingText, setEditingText] = useState("");
     
     const [users, setUsers] = useState<AppUser[]>([]);
-    const [filters, setFilters] = useState({ responsible: '', deadline: null as Date | null });
+    const [filters, setFilters] = useState({ responsibleId: '', deadline: null as Date | null });
     
     // Time tracking state
     const [isTimeLogDialogOpen, setIsTimeLogDialogOpen] = useState(false);
@@ -140,7 +142,7 @@ export default function ProjectDetailPage() {
         const task: Task = {
             id: `task_${Date.now()}`,
             text: taskInput.text.trim(),
-            responsible: taskInput.responsible.trim(),
+            responsibleIds: taskInput.responsibleIds,
             completed: false,
             timeLogs: [],
             ...(taskInput.deadline && { deadline: Timestamp.fromDate(taskInput.deadline) })
@@ -154,7 +156,7 @@ export default function ProjectDetailPage() {
         });
 
         await updateDoc(projectDocRef, { sections: updatedSections });
-        setNewTask(prev => ({ ...prev, [sectionId]: { text: "", responsible: "" }}));
+        setNewTask(prev => ({ ...prev, [sectionId]: { text: "", responsibleIds: [] }}));
     };
     
     const handleToggleTask = async (taskId: string, completed: boolean) => {
@@ -225,12 +227,12 @@ export default function ProjectDetailPage() {
 
     const filteredSections = useMemo(() => {
         if (!project || !project.sections) return [];
-        if (!filters.responsible && !filters.deadline) {
+        if (!filters.responsibleId && !filters.deadline) {
             return project.sections;
         }
         return project.sections?.map(section => {
             const filteredTasks = (section.tasks || []).filter(task => {
-                const responsibleMatch = !filters.responsible || task.responsible === filters.responsible;
+                const responsibleMatch = !filters.responsibleId || (task.responsibleIds || []).includes(filters.responsibleId);
                 const deadlineMatch = !filters.deadline || (task.deadline && format(task.deadline.toDate(), 'yyyy-MM-dd') === format(filters.deadline, 'yyyy-MM-dd'));
                 return responsibleMatch && deadlineMatch;
             });
@@ -290,14 +292,14 @@ export default function ProjectDetailPage() {
                         <CardContent className="flex flex-col md:flex-row gap-4">
                             <div className="flex-1 space-y-2">
                                 <Label>Responsável</Label>
-                                <Select onValueChange={(value) => setFilters(f => ({...f, responsible: value === 'all' ? '' : value}))}>
+                                <Select onValueChange={(value) => setFilters(f => ({...f, responsibleId: value === 'all' ? '' : value}))}>
                                     <SelectTrigger>
                                         <SelectValue placeholder="Filtrar por responsável..." />
                                     </SelectTrigger>
                                     <SelectContent>
                                         <SelectItem value="all">Todos</SelectItem>
                                         {users.map(user => (
-                                            <SelectItem key={user.id} value={user.name}>{user.name}</SelectItem>
+                                            <SelectItem key={user.id} value={user.id}>{user.name}</SelectItem>
                                         ))}
                                     </SelectContent>
                                 </Select>
@@ -328,7 +330,7 @@ export default function ProjectDetailPage() {
                                 </Popover>
                             </div>
                             <div className="flex items-end">
-                                <Button variant="ghost" onClick={() => setFilters({ responsible: '', deadline: null })}>Limpar Filtros</Button>
+                                <Button variant="ghost" onClick={() => setFilters({ responsibleId: '', deadline: null })}>Limpar Filtros</Button>
                             </div>
                         </CardContent>
                     </Card>
@@ -417,7 +419,12 @@ export default function ProjectDetailPage() {
                                         </label>
                                     )}
                                     <div className="flex items-center gap-2 ml-auto">
-                                        {task.responsible && <Badge variant="outline" className="hidden sm:flex items-center gap-1"><User size={12}/>{task.responsible}</Badge>}
+                                        <div className="hidden sm:flex items-center gap-1">
+                                            {(task.responsibleIds || []).map(userId => {
+                                                const user = users.find(u => u.id === userId);
+                                                return user ? <Badge key={userId} variant="outline" className="flex items-center gap-1"><User size={12}/>{user.name.split(' ')[0]}</Badge> : null;
+                                            })}
+                                        </div>
                                         {task.deadline && (
                                             <Badge variant="outline" className={cn("hidden sm:flex items-center gap-1", new Date(task.deadline.toDate()) < new Date() && !task.completed ? 'text-red-400 border-red-400/50' : '')}>
                                                 <CalendarIcon size={12}/>{format(task.deadline.toDate(), 'dd/MM/yy')}
@@ -444,29 +451,51 @@ export default function ProjectDetailPage() {
                                     </div>
                                 </div>
                             ))}
-                            <div className="flex items-center gap-2 pt-4 flex-wrap">
+                            <div className="flex items-start md:items-center gap-2 pt-4 flex-col md:flex-row">
                                 <Input 
                                     placeholder="Adicionar nova tarefa..." 
                                     className="h-9 flex-1 min-w-[200px]"
                                     value={newTask[section.id]?.text || ""}
-                                    onChange={(e) => setNewTask(prev => ({...prev, [section.id]: {...(prev[section.id] || {responsible: ''}), text: e.target.value}}))}
+                                    onChange={(e) => setNewTask(prev => ({...prev, [section.id]: {...(prev[section.id] || {responsibleIds: []}), text: e.target.value}}))}
                                 />
-                                <Select onValueChange={(value) => setNewTask(prev => ({...prev, [section.id]: {...(prev[section.id] || {text: ''}), responsible: value}}))} value={newTask[section.id]?.responsible || ''}>
-                                    <SelectTrigger className="h-9 w-[180px]">
-                                        <SelectValue placeholder="Responsável..." />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {users.map(user => (
-                                            <SelectItem key={user.id} value={user.name}>{user.name}</SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
+                                <Popover>
+                                    <PopoverTrigger asChild>
+                                        <Button variant="outline" role="combobox" className="h-9 w-full md:w-[200px] justify-between">
+                                            {newTask[section.id]?.responsibleIds?.length > 0
+                                                ? `${newTask[section.id]?.responsibleIds?.length} selecionado(s)`
+                                                : "Responsáveis..."}
+                                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                        </Button>
+                                    </PopoverTrigger>
+                                    <PopoverContent className="w-[200px] p-0">
+                                        <Command>
+                                            <CommandInput placeholder="Procurar membro..." />
+                                            <CommandEmpty>Nenhum membro encontrado.</CommandEmpty>
+                                            <CommandGroup>
+                                                <CommandList>
+                                                    {users.map((user) => (
+                                                        <CommandItem key={user.id} onSelect={() => {
+                                                            setNewTask(prev => {
+                                                                const currentIds = prev[section.id]?.responsibleIds || [];
+                                                                const newIds = currentIds.includes(user.id) ? currentIds.filter(id => id !== user.id) : [...currentIds, user.id];
+                                                                return {...prev, [section.id]: {...(prev[section.id] || {text:''}), responsibleIds: newIds}};
+                                                            })
+                                                        }}>
+                                                            <Check className={cn("mr-2 h-4 w-4", (newTask[section.id]?.responsibleIds || []).includes(user.id) ? "opacity-100" : "opacity-0")}/>
+                                                            {user.name}
+                                                        </CommandItem>
+                                                    ))}
+                                                </CommandList>
+                                            </CommandGroup>
+                                        </Command>
+                                    </PopoverContent>
+                                </Popover>
                                 <Popover>
                                     <PopoverTrigger asChild>
                                         <Button
                                         variant={"outline"}
                                         className={cn(
-                                            "h-9 w-[180px] justify-start text-left font-normal",
+                                            "h-9 w-full md:w-[180px] justify-start text-left font-normal",
                                             !newTask[section.id]?.deadline && "text-muted-foreground"
                                         )}
                                         >
@@ -478,7 +507,7 @@ export default function ProjectDetailPage() {
                                         <Calendar
                                         mode="single"
                                         selected={newTask[section.id]?.deadline}
-                                        onSelect={(date) => setNewTask(prev => ({...prev, [section.id]: {...(prev[section.id] || {text: '', responsible: ''}), deadline: date as Date}}))}
+                                        onSelect={(date) => setNewTask(prev => ({...prev, [section.id]: {...(prev[section.id] || {text: '', responsibleIds: []}), deadline: date as Date}}))}
                                         initialFocus
                                         />
                                     </PopoverContent>
@@ -523,5 +552,3 @@ export default function ProjectDetailPage() {
         </div>
     );
 }
-
-    
