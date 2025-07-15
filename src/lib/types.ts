@@ -121,6 +121,7 @@ export interface FinancialTransaction {
   // Fields for automated invoices from contracts
   invoiceId?: string; // Unique ID for the invoice, e.g., `contractId_YYYY_MM`
   contractId?: string;
+  recurringExpenseId?: string;
   clientId?: string;
 }
 
@@ -133,6 +134,15 @@ export interface Contract {
     startDate: Timestamp;
     status: 'active' | 'paused' | 'cancelled';
     createdAt: Timestamp;
+}
+
+export interface RecurringExpense {
+  id: string;
+  description: string;
+  amount: number;
+  category: string;
+  startDate: Timestamp;
+  status: 'active' | 'paused' | 'cancelled';
 }
 
 export interface Appointment {
@@ -148,5 +158,3 @@ export interface Appointment {
 
 // Re-exporting AI types to be used in the UI
 export type { AdsIACreatorInput };
-
-    

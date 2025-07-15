@@ -5,10 +5,10 @@ import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Briefcase, Users, ArrowRight, FolderKanban, ListTodo, Filter, CalendarIcon as CalendarIconLucide, User as UserIcon, PlusCircle, CheckCircle2, Loader2, Check, ChevronsUpDown, Trash2, DollarSign, RefreshCcw } from 'lucide-react';
+import { Briefcase, Users, ArrowRight, FolderKanban, ListTodo, Filter, CalendarIcon as CalendarIconLucide, User as UserIcon, PlusCircle, CheckCircle2, Loader2, Check, ChevronsUpDown, Trash2, DollarSign, RefreshCcw, ShoppingCart } from 'lucide-react';
 import { db } from '@/lib/firebase';
 import { collection, onSnapshot, query, where, Timestamp, addDoc, doc, updateDoc, deleteDoc } from 'firebase/firestore';
-import type { Client, Prospect, Project, Task, User, Appointment, FinancialTransaction, Contract } from '@/lib/types';
+import type { Client, Prospect, Project, Task, User, Appointment, FinancialTransaction, Contract, RecurringExpense } from '@/lib/types';
 import { Progress } from '@/components/ui/progress';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -43,6 +43,7 @@ export default function DashboardPage() {
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [financials, setFinancials] = useState<FinancialTransaction[]>([]);
   const [contracts, setContracts] = useState<Contract[]>([]);
+  const [recurringExpenses, setRecurringExpenses] = useState<RecurringExpense[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   
@@ -101,6 +102,12 @@ export default function DashboardPage() {
         setContracts(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Contract)));
     });
     unsubscribes.push(unsubscribeContracts);
+
+    const recurringExpensesQuery = query(collection(db, 'recurring_expenses'));
+    const unsubscribeRecurringExpenses = onSnapshot(recurringExpensesQuery, (snapshot) => {
+        setRecurringExpenses(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as RecurringExpense)));
+    });
+    unsubscribes.push(unsubscribeRecurringExpenses);
 
 
     // Fetch all projects from all clients
@@ -276,11 +283,12 @@ export default function DashboardPage() {
     });
   }, [allTasks, filters]);
   
-  const { totalBalance, mrr } = useMemo(() => {
+  const { totalBalance, mrr, crr } = useMemo(() => {
     const balance = financials.reduce((acc, t) => t.type === 'income' ? acc + t.amount : acc - t.amount, 0);
-    const recurring = contracts.reduce((acc, c) => c.status === 'active' ? acc + c.amount : acc, 0);
-    return { totalBalance: balance, mrr: recurring };
-  }, [financials, contracts]);
+    const monthlyRecurringRevenue = contracts.reduce((acc, c) => c.status === 'active' ? acc + c.amount : acc, 0);
+    const costRecurringRevenue = recurringExpenses.reduce((acc, e) => e.status === 'active' ? acc + e.amount : acc, 0);
+    return { totalBalance: balance, mrr: monthlyRecurringRevenue, crr: costRecurringRevenue };
+  }, [financials, contracts, recurringExpenses]);
 
   return (
     <div className="space-y-8">
@@ -289,7 +297,7 @@ export default function DashboardPage() {
         <p className="text-muted-foreground">Visão geral do seu negócio na Agência Digital.</p>
       </div>
       
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-5">
         <Dialog>
           <DialogTrigger asChild>
             <Card className="cursor-pointer hover:border-primary transition-colors">
@@ -361,7 +369,13 @@ export default function DashboardPage() {
          <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2"><CardTitle className="text-sm font-medium">MRR</CardTitle><RefreshCcw className="h-4 w-4 text-muted-foreground" /></CardHeader>
             <CardContent>
-                {isLoading ? <Skeleton className="h-8 w-1/2" /> : <div className="text-2xl font-bold">{formatCurrency(mrr)}</div>}
+                {isLoading ? <Skeleton className="h-8 w-1/2" /> : <div className="text-2xl font-bold text-primary">{formatCurrency(mrr)}</div>}
+            </CardContent>
+        </Card>
+         <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-2"><CardTitle className="text-sm font-medium">CRR</CardTitle><ShoppingCart className="h-4 w-4 text-muted-foreground" /></CardHeader>
+            <CardContent>
+                {isLoading ? <Skeleton className="h-8 w-1/2" /> : <div className="text-2xl font-bold text-destructive">{formatCurrency(crr)}</div>}
             </CardContent>
         </Card>
       </div>
@@ -574,5 +588,3 @@ export default function DashboardPage() {
     </div>
   );
 }
-
-    
