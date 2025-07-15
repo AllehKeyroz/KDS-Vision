@@ -5,7 +5,7 @@ import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Briefcase, Users, ArrowRight, FolderKanban, ListTodo, Filter, CalendarIcon, User as UserIcon } from 'lucide-react';
+import { Briefcase, Users, ArrowRight, FolderKanban, ListTodo, Filter, CalendarIcon as CalendarIconLucide, User as UserIcon } from 'lucide-react';
 import { db } from '@/lib/firebase';
 import { collection, onSnapshot, query, where, Timestamp } from 'firebase/firestore';
 import type { Client, Prospect, Project, Task, User } from '@/lib/types';
@@ -17,6 +17,8 @@ import { Calendar } from '@/components/ui/calendar';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from '@/components/ui/dialog';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 export default function DashboardPage() {
   const [clients, setClients] = useState<Client[]>([]);
@@ -119,40 +121,105 @@ export default function DashboardPage() {
       </div>
       
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Clientes Ativos</CardTitle>
-            <Users className="w-4 h-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            {isLoading ? <Skeleton className="h-8 w-1/4" /> : <div className="text-2xl font-bold">{clients.length}</div>}
-            <p className="text-xs text-muted-foreground">Clientes com projetos em andamento.</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Prospects em Andamento</CardTitle>
-            <Briefcase className="w-4 h-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-             {isLoading ? <Skeleton className="h-8 w-1/4" /> : <div className="text-2xl font-bold">{prospects.length}</div>}
-            <p className="text-xs text-muted-foreground">Leads no funil de vendas.</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Projetos Totais</CardTitle>
-            <FolderKanban className="w-4 h-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            {isLoading ? <Skeleton className="h-8 w-1/4" /> : <div className="text-2xl font-bold">{projects.length}</div>}
-            <p className="text-xs text-muted-foreground">Gerenciando o sucesso dos clientes.</p>
-          </CardContent>
-        </Card>
+        <Dialog>
+          <DialogTrigger asChild>
+            <Card className="cursor-pointer hover:border-primary transition-colors">
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm font-medium">Clientes Ativos</CardTitle>
+                <Users className="w-4 h-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                {isLoading ? <Skeleton className="h-8 w-1/4" /> : <div className="text-2xl font-bold">{clients.length}</div>}
+                <p className="text-xs text-muted-foreground">Clientes com projetos em andamento.</p>
+              </CardContent>
+            </Card>
+          </DialogTrigger>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Clientes Ativos</DialogTitle>
+              <DialogDescription>Lista de todos os clientes ativos.</DialogDescription>
+            </DialogHeader>
+            <ScrollArea className="max-h-96">
+                {clients.map(client => (
+                    <Link key={client.id} href={`/clients/${client.id}`} passHref>
+                        <div className="flex items-center justify-between p-2 rounded-md hover:bg-secondary">
+                           <p className="font-medium">{client.name}</p>
+                           <ArrowRight className="h-4 w-4 text-muted-foreground" />
+                        </div>
+                    </Link>
+                ))}
+            </ScrollArea>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog>
+          <DialogTrigger asChild>
+            <Card className="cursor-pointer hover:border-primary transition-colors">
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm font-medium">Prospects em Andamento</CardTitle>
+                <Briefcase className="w-4 h-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                {isLoading ? <Skeleton className="h-8 w-1/4" /> : <div className="text-2xl font-bold">{prospects.length}</div>}
+                <p className="text-xs text-muted-foreground">Leads no funil de vendas.</p>
+              </CardContent>
+            </Card>
+           </DialogTrigger>
+           <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Prospects em Andamento</DialogTitle>
+              <DialogDescription>Lista de todos os prospects no funil.</DialogDescription>
+            </DialogHeader>
+            <ScrollArea className="max-h-96">
+                {prospects.map(prospect => (
+                    <Link key={prospect.id} href="/prospects" passHref>
+                        <div className="flex items-center justify-between p-2 rounded-md hover:bg-secondary">
+                           <p className="font-medium">{prospect.name}</p>
+                           <p className="text-sm text-muted-foreground">{prospect.stage}</p>
+                        </div>
+                    </Link>
+                ))}
+            </ScrollArea>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog>
+            <DialogTrigger asChild>
+                <Card className="cursor-pointer hover:border-primary transition-colors">
+                  <CardHeader className="flex flex-row items-center justify-between pb-2">
+                    <CardTitle className="text-sm font-medium">Projetos Totais</CardTitle>
+                    <FolderKanban className="w-4 h-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    {isLoading ? <Skeleton className="h-8 w-1/4" /> : <div className="text-2xl font-bold">{projects.length}</div>}
+                    <p className="text-xs text-muted-foreground">Gerenciando o sucesso dos clientes.</p>
+                  </CardContent>
+                </Card>
+            </DialogTrigger>
+             <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Projetos em Andamento</DialogTitle>
+                  <DialogDescription>Lista de todos os projetos em andamento.</DialogDescription>
+                </DialogHeader>
+                <ScrollArea className="max-h-96">
+                    {projects.filter(p => p.status !== 'Concluído').map(project => (
+                        <Link key={project.id} href={`/clients/${project.clientId}/projects/${project.id}`} passHref>
+                             <div className="flex items-center justify-between p-2 rounded-md hover:bg-secondary">
+                               <div>
+                                   <p className="font-medium">{project.name}</p>
+                                   <p className="text-sm text-muted-foreground">{clients.find(c => c.id === project.clientId)?.name}</p>
+                               </div>
+                               <ArrowRight className="h-4 w-4 text-muted-foreground" />
+                            </div>
+                        </Link>
+                    ))}
+                </ScrollArea>
+              </DialogContent>
+        </Dialog>
       </div>
 
-       <div className="grid gap-8 md:grid-cols-2">
-          <Card className="col-span-1 md:col-span-2">
+       <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
+          <Card className="col-span-1 md:col-span-2 lg:col-span-2">
               <CardHeader>
                   <CardTitle className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
@@ -190,7 +257,7 @@ export default function DashboardPage() {
                                             <Popover>
                                                 <PopoverTrigger asChild>
                                                     <Button variant={"outline"} className={cn("col-span-2 h-8 justify-start text-left font-normal", !filters.deadline && "text-muted-foreground")}>
-                                                        <CalendarIcon className="mr-2 h-4 w-4" />
+                                                        <CalendarIconLucide className="mr-2 h-4 w-4" />
                                                         {filters.deadline ? format(filters.deadline, "PPP") : <span>Escolha uma data</span>}
                                                     </Button>
                                                 </PopoverTrigger>
@@ -206,8 +273,8 @@ export default function DashboardPage() {
                   <CardDescription>Tarefas pendentes de todos os projetos, ordenadas por urgência.</CardDescription>
               </CardHeader>
               <CardContent>
-                  <div className="space-y-4 max-h-96 overflow-y-auto">
-                      {isLoading ? Array.from({length: 5}).map((_, i) => <Skeleton key={i} className="h-10 w-full" />) :
+                  <ScrollArea className="h-96">
+                      {isLoading ? Array.from({length: 5}).map((_, i) => <Skeleton key={i} className="h-10 w-full mb-2" />) :
                        filteredTasks.length > 0 ? filteredTasks.map(task => (
                            <Link key={task.id} href={`/clients/${task.clientId}/projects/${task.projectId}`} className="block">
                                <div className="flex items-center justify-between p-2 rounded-md hover:bg-secondary">
@@ -228,56 +295,20 @@ export default function DashboardPage() {
                        )) : (
                           <p className="text-muted-foreground text-center py-8">Nenhuma tarefa pendente encontrada.</p>
                        )}
-                  </div>
+                  </ScrollArea>
               </CardContent>
           </Card>
-
-          <Card>
-            <CardHeader>
-                <CardTitle>Projetos em Andamento</CardTitle>
-            </CardHeader>
-            <CardContent className="grid gap-4 max-h-96 overflow-y-auto">
-               {isLoading ? Array.from({length: 3}).map((_, i) => <Skeleton key={i} className="h-16 w-full" />) :
-                projects.filter(p => p.status !== 'Concluído').map(project => (
-                  <Link key={project.id} href={`/clients/${project.clientId}/projects/${project.id}`}>
-                    <div className="mb-4 grid grid-cols-[25px_1fr] items-start pb-4 last:mb-0 last:pb-0 hover:bg-secondary p-2 rounded-md">
-                      <span className="flex h-2 w-2 translate-y-1 rounded-full bg-sky-500" />
-                      <div className="space-y-1">
-                        <p className="text-sm font-medium leading-none">
-                          {project.name}
-                        </p>
-                        <p className="text-sm text-muted-foreground">
-                         Cliente: {clients.find(c => c.id === project.clientId)?.name}
-                        </p>
-                         <Progress value={calculateProgress(project)} className="h-2 mt-2"/>
-                      </div>
-                    </div>
-                  </Link>
-                ))}
-            </CardContent>
-          </Card>
            
-          <Card>
+          <Card className="col-span-1 md:col-span-2 lg:col-span-1">
             <CardHeader>
-                <CardTitle>Acesso Rápido</CardTitle>
+                <CardTitle>Calendário de Compromissos</CardTitle>
+                 <CardDescription>Clique em uma data para adicionar um evento.</CardDescription>
             </CardHeader>
-            <CardContent className="grid gap-4">
-                 <Link href="/clients" passHref>
-                    <div className="hover:bg-secondary transition-colors p-4 rounded-lg border">
-                        <h3 className="font-semibold flex items-center justify-between">
-                            Gerenciar Clientes <ArrowRight className="w-5 h-5" />
-                        </h3>
-                        <p className="text-sm text-muted-foreground">Acesse os painéis e projetos de seus clientes.</p>
-                    </div>
-                </Link>
-                 <Link href="/prospects" passHref>
-                    <div className="hover:bg-secondary transition-colors p-4 rounded-lg border">
-                        <h3 className="font-semibold flex items-center justify-between">
-                            Funil de Prospecção <ArrowRight className="w-5 h-5" />
-                        </h3>
-                        <p className="text-sm text-muted-foreground">Organize seus leads e follow-ups.</p>
-                    </div>
-                </Link>
+            <CardContent>
+                <Calendar
+                    mode="single"
+                    className="p-0"
+                />
             </CardContent>
           </Card>
       </div>
