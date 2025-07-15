@@ -1,39 +1,24 @@
+
 'use client'
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { useParams } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
-import { Save, Building2, Palette, Package, TrendingUp, BarChart2, DollarSign } from 'lucide-react';
+import { Save, Building2, Palette, Package, TrendingUp } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from '@/components/ui/input';
-import { collection, doc, getDoc, onSnapshot, setDoc, query } from 'firebase/firestore';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Skeleton } from '@/components/ui/skeleton';
-import type { Project, User } from '@/lib/types';
-import { formatCurrency, cn } from '@/lib/utils';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-
-type ClientAnalysis = {
-    totalInvestido: number;
-    totalCustoReal: number;
-    totalLucro: number;
-    roi: number;
-    projectsData: { name: string; value: number; cost: number; }[];
-}
 
 export default function ClientContextPage() {
     const params = useParams();
     const clientId = params.clientId as string;
     const { toast } = useToast();
     const [isLoading, setIsLoading] = useState(true);
-    const [isAnalysisLoading, setIsAnalysisLoading] = useState(true);
-
-    const [projects, setProjects] = useState<Project[]>([]);
-    const [users, setUsers] = useState<User[]>([]);
-    const [analysis, setAnalysis] = useState<ClientAnalysis | null>(null);
 
     const [contextData, setContextData] = useState({
         company: { history: '', mission: '', vision: '', values: '', team: '' },
@@ -46,8 +31,6 @@ export default function ClientContextPage() {
         if (!clientId) return;
 
         const contextDocRef = doc(db, 'clients', clientId, 'context', 'data');
-        const projectsColRef = collection(db, 'clients', clientId, 'projects');
-        const usersColRef = collection(db, 'users');
 
         const fetchContext = async () => {
             setIsLoading(true);
@@ -58,53 +41,9 @@ export default function ClientContextPage() {
             setIsLoading(false);
         }
 
-        const unsubscribeProjects = onSnapshot(query(projectsColRef), (snapshot) => {
-             setProjects(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Project)));
-             setIsAnalysisLoading(false);
-        });
-
-        const unsubscribeUsers = onSnapshot(query(usersColRef), (snapshot) => {
-            setUsers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as User)));
-        });
-
         fetchContext();
-
-        return () => {
-            unsubscribeProjects();
-            unsubscribeUsers();
-        };
-
     }, [clientId]);
 
-    useEffect(() => {
-        if (projects.length > 0 && users.length > 0) {
-            let totalInvestido = 0;
-            let totalCustoReal = 0;
-            const projectsData: { name: string; value: number; cost: number; }[] = [];
-
-            projects.forEach(project => {
-                totalInvestido += project.value;
-                const projectCost = (project.sections || []).reduce((acc, section) => {
-                    (section.tasks || []).forEach(task => {
-                       (task.timeLogs || []).forEach(log => {
-                           const user = users.find(u => u.id === log.userId);
-                           if (user && user.costPerHour) {
-                               acc += log.hours * user.costPerHour;
-                           }
-                       });
-                   });
-                   return acc;
-                }, 0);
-                totalCustoReal += projectCost;
-                projectsData.push({ name: project.name, value: project.value, cost: projectCost });
-            });
-
-            const totalLucro = totalInvestido - totalCustoReal;
-            const roi = totalCustoReal > 0 ? (totalLucro / totalCustoReal) * 100 : 0;
-            
-            setAnalysis({ totalInvestido, totalCustoReal, totalLucro, roi, projectsData });
-        }
-    }, [projects, users]);
 
     const handleChange = (tab: string, field: string, value: string) => {
         setContextData(prev => ({
@@ -146,60 +85,6 @@ export default function ClientContextPage() {
 
     return (
         <div className="space-y-6">
-            {analysis && (
-                <Card>
-                    <CardHeader>
-                        <CardTitle className="font-headline flex items-center gap-2"><DollarSign /> Análise Financeira do Cliente</CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-6">
-                        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 text-center">
-                            <div className="p-4 bg-secondary/50 rounded-lg">
-                                <p className="text-sm text-muted-foreground">Investimento Total</p>
-                                <p className="text-2xl font-bold text-primary">{formatCurrency(analysis.totalInvestido)}</p>
-                            </div>
-                            <div className="p-4 bg-secondary/50 rounded-lg">
-                                <p className="text-sm text-muted-foreground">Custo Real Total</p>
-                                <p className="text-2xl font-bold text-destructive">{formatCurrency(analysis.totalCustoReal)}</p>
-                            </div>
-                            <div className="p-4 bg-secondary/50 rounded-lg">
-                                <p className="text-sm text-muted-foreground">Lucro Total</p>
-                                <p className={cn("text-2xl font-bold", analysis.totalLucro >= 0 ? "text-green-500" : "text-red-500")}>
-                                    {formatCurrency(analysis.totalLucro)}
-                                </p>
-                            </div>
-                             <div className="p-4 bg-secondary/50 rounded-lg">
-                                <p className="text-sm text-muted-foreground">ROI</p>
-                                <p className={cn("text-2xl font-bold", analysis.roi >= 0 ? "text-green-500" : "text-red-500")}>
-                                    {analysis.roi.toFixed(2)}%
-                                </p>
-                            </div>
-                        </div>
-                        {analysis.projectsData.length > 0 && (
-                            <div>
-                                <h4 className="text-lg font-semibold mb-2 text-center">Desempenho por Projeto</h4>
-                                <div className="h-80 w-full">
-                                    <ResponsiveContainer width="100%" height="100%">
-                                        <BarChart data={analysis.projectsData} margin={{ top: 5, right: 20, left: 20, bottom: 5 }}>
-                                            <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border) / 0.5)" />
-                                            <XAxis dataKey="name" stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} />
-                                            <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(value) => formatCurrency(value, 'compact')}/>
-                                            <Tooltip
-                                                cursor={{ fill: 'hsl(var(--accent))' }}
-                                                contentStyle={{ backgroundColor: 'hsl(var(--background))', borderColor: 'hsl(var(--border))' }}
-                                                formatter={(value: number) => formatCurrency(value)}
-                                            />
-                                            <Legend />
-                                            <Bar dataKey="value" name="Valor Faturado" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
-                                            <Bar dataKey="cost" name="Custo Real" fill="hsl(var(--destructive))" radius={[4, 4, 0, 0]} />
-                                        </BarChart>
-                                    </ResponsiveContainer>
-                                </div>
-                            </div>
-                        )}
-                    </CardContent>
-                </Card>
-            )}
-
             <Card>
                 <CardHeader>
                     <CardTitle className="font-headline">Contexto do Cliente</CardTitle>

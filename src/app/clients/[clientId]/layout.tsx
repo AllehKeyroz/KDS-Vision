@@ -6,7 +6,7 @@ import type { Client } from '@/lib/types';
 import { doc, getDoc } from 'firebase/firestore';
 import Link from 'next/link';
 import { usePathname, useParams } from 'next/navigation';
-import { Folder, Wand2, CheckSquare, AlertTriangle, KeyRound, FileText } from 'lucide-react';
+import { Folder, Wand2, CheckSquare, AlertTriangle, KeyRound, FileText, DollarSign } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useEffect, useState } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -14,6 +14,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 const tabs = [
   { name: 'Contexto', href: '', icon: FileText },
   { name: 'Projetos', href: '/projects', icon: Folder },
+  { name: 'Financeiro', href: '/financials', icon: DollarSign },
   { name: 'Ferramentas IA', href: '/tools', icon: Wand2 },
   { name: 'Playbooks', href: '/playbooks', icon: CheckSquare },
   { name: 'Issues', href: '/issues', icon: AlertTriangle },
