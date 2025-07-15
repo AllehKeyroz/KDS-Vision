@@ -6,13 +6,83 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { PlusCircle, Loader2, Trash2, CheckSquare, List, Pencil, X, Check } from 'lucide-react';
+import { PlusCircle, Loader2, Trash2, CheckSquare, X, Wand2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { db } from '@/lib/firebase';
-import { collection, addDoc, onSnapshot, doc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { collection, addDoc, onSnapshot, doc, deleteDoc, writeBatch } from 'firebase/firestore';
 import type { ProcessoTemplate, ProcessoItem } from '@/lib/types';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
+
+const suggestedTemplates = [
+    {
+        title: "Onboarding de Novo Cliente",
+        items: [
+            { text: "Contrato assinado e arquivado" },
+            { text: "Pagamento inicial confirmado" },
+            { text: "Reunião de Kick-off agendada" },
+            { text: "Acessos necessários solicitados (redes sociais, site, etc.)" },
+            { text: "Questionário de Briefing enviado ao cliente" },
+            { text: "Criação do grupo de comunicação (WhatsApp, Slack, etc.)" },
+            { text: "Apresentação da equipe responsável ao cliente" },
+        ],
+    },
+    {
+        title: "Análise de Concorrentes",
+        items: [
+            { text: "Identificar 3-5 concorrentes diretos" },
+            { text: "Analisar presença nas redes sociais (conteúdo, frequência, engajamento)" },
+            { text: "Analisar site e blog (palavras-chave, qualidade do conteúdo)" },
+            { text: "Analisar campanhas de tráfego pago (se visível)" },
+            { text: "Identificar pontos fortes e fracos dos concorrentes" },
+            { text: "Compilar relatório de análise competitiva" },
+        ],
+    },
+    {
+        title: "Checklist de Google Meu Negócio",
+        items: [
+            { text: "Reivindicar ou criar o perfil da empresa" },
+            { text: "Verificar se o nome, endereço e telefone (NAP) estão corretos" },
+            { text: "Selecionar categorias primárias e secundárias" },
+            { text: "Adicionar horário de funcionamento" },
+            { text: "Escrever descrição da empresa com SEO" },
+            { text: "Fazer upload de 10 fotos de alta qualidade (logo, capa, internas, externas, equipe)" },
+            { text: "Adicionar lista de produtos e serviços" },
+            { text: "Configurar a ferramenta de mensagens" },
+            { text: "Criar uma primeira postagem de boas-vindas" },
+            { text: "Criar link para solicitar avaliações dos clientes" },
+        ],
+    },
+    {
+        title: "SEO On-Page (Básico)",
+        items: [
+            { text: "Pesquisa de palavra-chave principal e secundárias para a página" },
+            { text: "Otimizar Título da Página (Title Tag)" },
+            { text: "Otimizar Meta Descrição" },
+            { text: "Usar URLs amigáveis" },
+            { text: "Verificar o uso correto de Heading Tags (H1, H2, H3)" },
+            { text: "Otimizar atributos 'alt' das imagens" },
+            { text: "Verificar a velocidade de carregamento da página" },
+            { text: "Garantir que a página seja responsiva (mobile-friendly)" },
+            { text: "Adicionar links internos para outras páginas relevantes" },
+        ],
+    },
+    {
+        title: "Setup de Campanha (Tráfego Pago)",
+        items: [
+            { text: "Definir objetivo principal da campanha (vendas, leads, tráfego)" },
+            { text: "Definir persona e público-alvo" },
+            { text: "Configurar Pixel de Rastreamento/Conversão no site" },
+            { text: "Criar estrutura da campanha (Campanha > Conjuntos de Anúncios > Anúncios)" },
+            { text: "Definir orçamentos diários/vitalícios" },
+            { text: "Criar os criativos (imagens/vídeos)" },
+            { text: "Escrever as copies (títulos, descrições, CTAs)" },
+            { text: "Configurar segmentação de público (interesses, demografia, etc.)" },
+            { text: "Revisar e publicar a campanha" },
+        ],
+    },
+];
+
 
 export default function ProcessosPage() {
     const { toast } = useToast();
@@ -20,6 +90,7 @@ export default function ProcessosPage() {
     const [templates, setTemplates] = useState<ProcessoTemplate[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
+    const [isSeeding, setIsSeeding] = useState(false);
     
     // States for creating a new template
     const [newTemplateTitle, setNewTemplateTitle] = useState('');
@@ -80,6 +151,24 @@ export default function ProcessosPage() {
         }
     }
 
+    const handleSeedTemplates = async () => {
+        setIsSeeding(true);
+        try {
+            const batch = writeBatch(db);
+            suggestedTemplates.forEach(template => {
+                const docRef = doc(templatesCollectionRef);
+                batch.set(docRef, template);
+            });
+            await batch.commit();
+            toast({ title: "Processos Adicionados!", description: "Os templates sugeridos foram adicionados à sua lista." });
+        } catch (error) {
+             console.error("Error seeding templates:", error);
+            toast({ title: "Erro ao adicionar templates", variant: "destructive" });
+        } finally {
+            setIsSeeding(false);
+        }
+    }
+
 
     return (
         <div className="space-y-6">
@@ -134,6 +223,19 @@ export default function ProcessosPage() {
                         Salvar Template
                     </Button>
                 </CardFooter>
+            </Card>
+            
+            <Card>
+                <CardHeader>
+                    <CardTitle>Automação de Processos</CardTitle>
+                     <CardDescription>Não sabe por onde começar? Adicione nossos templates de processos sugeridos com um clique.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <Button onClick={handleSeedTemplates} disabled={isSeeding}>
+                        {isSeeding ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Wand2 className="mr-2 h-4 w-4" />}
+                        Adicionar Processos Sugeridos
+                    </Button>
+                </CardContent>
             </Card>
 
             <Card>
