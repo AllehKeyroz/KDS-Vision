@@ -110,6 +110,14 @@ export interface FinancialTransaction {
   recurring: boolean;
 }
 
+export interface Appointment {
+  id: string;
+  title: string;
+  date: Date; // Stored as Timestamp in Firestore, converted to Date on client
+  userId: string;
+  notes?: string;
+}
+
 
 // Re-exporting AI types to be used in the UI
 export type { AdsIACreatorInput };

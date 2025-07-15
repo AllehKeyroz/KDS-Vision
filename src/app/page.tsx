@@ -5,10 +5,10 @@ import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Briefcase, Users, ArrowRight, FolderKanban, ListTodo, Filter, CalendarIcon as CalendarIconLucide, User as UserIcon } from 'lucide-react';
+import { Briefcase, Users, ArrowRight, FolderKanban, ListTodo, Filter, CalendarIcon as CalendarIconLucide, User as UserIcon, PlusCircle, CheckCircle2 } from 'lucide-react';
 import { db } from '@/lib/firebase';
-import { collection, onSnapshot, query, where, Timestamp } from 'firebase/firestore';
-import type { Client, Prospect, Project, Task, User } from '@/lib/types';
+import { collection, onSnapshot, query, where, Timestamp, addDoc, doc, updateDoc, deleteDoc } from 'firebase/firestore';
+import type { Client, Prospect, Project, Task, User, Appointment } from '@/lib/types';
 import { Progress } from '@/components/ui/progress';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -17,30 +17,59 @@ import { Calendar } from '@/components/ui/calendar';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger, DialogClose, DialogFooter } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { useToast } from '@/hooks/use-toast';
+import { ptBR } from 'date-fns/locale';
 
 export default function DashboardPage() {
+  const { toast } = useToast();
   const [clients, setClients] = useState<Client[]>([]);
   const [prospects, setProspects] = useState<Prospect[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [allTasks, setAllTasks] = useState<(Task & { projectName: string; clientId: string; projectId: string })[]>([]);
   const [users, setUsers] = useState<User[]>([]);
+  const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  
   const [filters, setFilters] = useState({ responsible: '', deadline: null as Date | null });
+  const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
+  const [isAppointmentDialogOpen, setIsAppointmentDialogOpen] = useState(false);
+  const [newAppointment, setNewAppointment] = useState<{ title: string; notes: string; userId: string }>({ title: '', notes: '', userId: '' });
 
   useEffect(() => {
-    const unsubscribeClients = onSnapshot(collection(db, 'clients'), (snapshot) => {
-      setClients(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Client)));
-    });
+    const unsubscribes: (() => void)[] = [];
+    setIsLoading(true);
 
-    const unsubscribeProspects = onSnapshot(collection(db, 'prospects'), (snapshot) => {
-      setProspects(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Prospect)));
-    });
+    const subscribe = (col: string, setter: (data: any[]) => void) => {
+        const ref = collection(db, col);
+        const q = col === 'appointments' ? query(ref) : ref; // No specific query for others yet
+        const unsubscribe = onSnapshot(q, (snapshot) => {
+            setter(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+        });
+        unsubscribes.push(unsubscribe);
+    };
 
-    const unsubscribeUsers = onSnapshot(collection(db, 'users'), (snapshot) => {
-      setUsers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as User)));
+    subscribe('clients', setClients);
+    subscribe('prospects', setProspects);
+    subscribe('users', setUsers);
+    
+    const appointmentsQuery = query(collection(db, 'appointments'));
+    const unsubscribeAppointments = onSnapshot(appointmentsQuery, (snapshot) => {
+        setAppointments(snapshot.docs.map(doc => {
+            const data = doc.data();
+            return {
+                id: doc.id,
+                ...data,
+                date: (data.date as Timestamp).toDate(),
+            } as Appointment;
+        }));
     });
+    unsubscribes.push(unsubscribeAppointments);
+
 
     // Fetch all projects from all clients
     const unsubscribeProjects = onSnapshot(query(collection(db, 'clients')), (clientsSnapshot) => {
@@ -76,14 +105,48 @@ export default function DashboardPage() {
             setIsLoading(false);
         });
     });
+    unsubscribes.push(unsubscribeProjects);
 
-    return () => {
-        unsubscribeClients();
-        unsubscribeProspects();
-        unsubscribeUsers();
-        unsubscribeProjects();
-    };
+    return () => unsubscribes.forEach(unsub => unsub());
   }, []);
+
+  const handleDateSelect = (date: Date | undefined) => {
+    if (!date) return;
+    setSelectedDate(date);
+    setIsAppointmentDialogOpen(true);
+  };
+  
+  const handleAddAppointment = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newAppointment.title || !newAppointment.userId || !selectedDate) {
+        toast({ title: 'Campos obrigatórios', description: 'Título e responsável são necessários.', variant: 'destructive' });
+        return;
+    }
+    setIsSaving(true);
+    try {
+        await addDoc(collection(db, 'appointments'), {
+            ...newAppointment,
+            date: Timestamp.fromDate(selectedDate),
+        });
+        toast({ title: 'Compromisso Adicionado!', description: 'O novo compromisso foi salvo.' });
+        setIsAppointmentDialogOpen(false);
+        setNewAppointment({ title: '', notes: '', userId: '' });
+    } catch (error) {
+        toast({ title: 'Erro ao salvar', variant: 'destructive' });
+    } finally {
+        setIsSaving(false);
+    }
+  };
+  
+  const dailyAppointments = useMemo(() => {
+    if (!selectedDate) return [];
+    return appointments.filter(app => format(app.date, 'yyyy-MM-dd') === format(selectedDate, 'yyyy-MM-dd'));
+  }, [appointments, selectedDate]);
+  
+  const appointmentDates = useMemo(() => {
+      return appointments.map(app => app.date);
+  }, [appointments]);
+
 
   const calculateProgress = (project: Project): number => {
     const allTasks = project.sections?.flatMap(s => s.tasks || []) || [];
@@ -302,18 +365,80 @@ export default function DashboardPage() {
           <Card className="col-span-1 md:col-span-2 lg:col-span-1">
             <CardHeader>
                 <CardTitle>Calendário de Compromissos</CardTitle>
-                 <CardDescription>Clique em uma data para adicionar um evento.</CardDescription>
+                 <CardDescription>Clique em uma data para adicionar um evento ou ver os existentes.</CardDescription>
             </CardHeader>
             <CardContent>
                 <Calendar
                     mode="single"
-                    className="p-0"
+                    selected={selectedDate}
+                    onSelect={handleDateSelect}
+                    className="p-0 rounded-md border"
+                    locale={ptBR}
+                    modifiers={{ scheduled: appointmentDates }}
+                    modifiersClassNames={{
+                        scheduled: 'bg-primary/20 text-primary-foreground rounded-full',
+                    }}
                 />
+                 <div className="mt-4 space-y-2">
+                    <h4 className="font-semibold">Compromissos para {selectedDate ? format(selectedDate, 'dd/MM/yyyy') : '...'}:</h4>
+                    {dailyAppointments.length > 0 ? (
+                        <ScrollArea className="h-40">
+                        {dailyAppointments.map(app => (
+                            <div key={app.id} className="text-sm p-2 rounded-md bg-secondary/50 mb-1">
+                                <p className="font-bold">{app.title}</p>
+                                <p className="text-xs text-muted-foreground">Responsável: {users.find(u => u.id === app.userId)?.name || 'N/A'}</p>
+                                {app.notes && <p className="text-xs mt-1">{app.notes}</p>}
+                            </div>
+                        ))}
+                        </ScrollArea>
+                    ) : (
+                        <p className="text-sm text-muted-foreground">Nenhum compromisso para esta data.</p>
+                    )}
+                 </div>
             </CardContent>
           </Card>
       </div>
+
+       <Dialog open={isAppointmentDialogOpen} onOpenChange={setIsAppointmentDialogOpen}>
+        <DialogContent>
+            <DialogHeader>
+                <DialogTitle>Adicionar Compromisso</DialogTitle>
+                <DialogDescription>
+                    Agende um novo compromisso para {selectedDate ? format(selectedDate, 'PPP', {locale: ptBR}) : ''}.
+                </DialogDescription>
+            </DialogHeader>
+            <form onSubmit={handleAddAppointment} className="space-y-4">
+                <div>
+                    <Label htmlFor="title">Título do Compromisso</Label>
+                    <Input id="title" value={newAppointment.title} onChange={e => setNewAppointment(p => ({...p, title: e.target.value}))} required />
+                </div>
+                <div>
+                    <Label htmlFor="userId">Atribuir a</Label>
+                    <Select onValueChange={value => setNewAppointment(p => ({...p, userId: value}))} required>
+                        <SelectTrigger id="userId">
+                            <SelectValue placeholder="Selecione um membro da equipe" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            {users.map(user => (
+                                <SelectItem key={user.id} value={user.id}>{user.name}</SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                </div>
+                 <div>
+                    <Label htmlFor="notes">Notas (Opcional)</Label>
+                    <Textarea id="notes" value={newAppointment.notes} onChange={e => setNewAppointment(p => ({...p, notes: e.target.value}))} />
+                </div>
+                <DialogFooter>
+                    <DialogClose asChild><Button type="button" variant="outline">Cancelar</Button></DialogClose>
+                    <Button type="submit" disabled={isSaving}>
+                        {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                        Salvar Compromisso
+                    </Button>
+                </DialogFooter>
+            </form>
+        </DialogContent>
+       </Dialog>
     </div>
   );
 }
-
-    
