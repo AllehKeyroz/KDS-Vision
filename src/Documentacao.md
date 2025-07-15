@@ -18,7 +18,7 @@ Este documento serve como um raio-x do estado atual do projeto, detalhando as fu
 | **3.1** | Relacionamento e Colaboração | পেন্ডিং | Portal do Cliente                                                                                                      |
 | **3.2** | Relacionamento e Colaboração | **Concluído** | Relatórios Automatizados de Desempenho - Base (Métricas Financeiras)                                                      |
 | **3.3** | Relacionamento e Colaboração | পেন্ডিং | Sistema de Aprovação Integrado                                                                                         |
-| **4.1** | Análise e Inteligência         | পেন্ডিং | Dashboard de ROI por Cliente                                                                                           |
+| **4.1** | Análise e Inteligência         | **Em Andamento** | Dashboard de ROI por Cliente                                                                                           |
 | **4.2** | Análise e Inteligência         | পেন্ডিং | Análise de Rentabilidade da Agência                                                                                    |
 | **4.3** | Análise e Inteligência         | পেন্ডিং | Benchmarking de Performance                                                                                            |
 | **5.1** | Gestão Interna               | **Concluído** | Gestão de Propostas e Contratos - Base                                                                                 |
@@ -47,7 +47,8 @@ Este documento serve como um raio-x do estado atual do projeto, detalhando as fu
 #### Módulos do Cliente (`/src/app/clients/[clientId]/...`)
 - **(ID 1.2) Contexto do Cliente (`/src/app/clients/[clientId]/page.tsx`):**
   - **Descrição:** Área para centralizar informações sobre a empresa, branding, produtos e marketing (incluindo o público-alvo/ICP). Serve como base para as ferramentas de IA.
-  - **Componentes:** `Tabs`, `Textarea`, `Input`, `Button`.
+  - **(ID 4.1) Dashboard de ROI:** Inclui um card de "Análise Financeira do Cliente" que consolida o investimento total, custo real, lucro e ROI de todos os projetos do cliente, com um gráfico comparativo.
+  - **Componentes:** `Tabs`, `Textarea`, `Input`, `Button`, `Card`, `BarChart`.
 
 - **Gestão de Projetos (`.../projects/page.tsx` e `.../projects/[projectId]/page.tsx`):**
   - **Descrição:** Permite criar projetos com escopo, valor e status. Dentro de um projeto, é possível criar seções e tarefas. Cada tarefa pode ser marcada como concluída e ter responsáveis e prazo. A página de detalhes do projeto calcula o progresso com base nas tarefas concluídas.
@@ -96,7 +97,5 @@ Este documento serve como um raio-x do estado atual do projeto, detalhando as fu
     - `3.3. Sistema de Aprovação Integrado:` Adicionar um status de "Aguardando Aprovação" nas tarefas e criativos. Notificar o cliente (via Portal do Cliente) para que ele possa aprovar ou solicitar revisão.
 
 3.  **Módulo 4: Análise e Inteligência (A Prova de Valor)** - **NÃO INICIADO**
-    - `4.1. Dashboard de ROI por Cliente:` Criar um novo dashboard no perfil do cliente que cruze os dados do módulo financeiro (investimento) com métricas de resultado (a serem definidas, como leads ou vendas) para calcular o ROI.
     - `4.2. Análise de Rentabilidade da Agência:` Desenvolver um dashboard de alto nível (possivelmente em `/financials`) que consolide a margem de lucro de todos os projetos para identificar os clientes mais e menos rentáveis.
     - `4.3. Benchmarking de Performance:` Funcionalidade complexa que dependeria de uma base de dados anônima para comparar o desempenho de campanhas entre clientes do mesmo nicho.
-
