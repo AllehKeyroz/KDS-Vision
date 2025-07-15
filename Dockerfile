@@ -1,5 +1,5 @@
 # Dockerfile
-
+RUN npm install --omit=dev
 # 1. Estágio de Dependências
 FROM node:20-alpine AS deps
 WORKDIR /app
