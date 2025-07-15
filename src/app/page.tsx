@@ -122,10 +122,10 @@ export default function DashboardPage() {
 
   const handleOpenAppointmentDialog = (appointment?: Appointment | null, timeSlot?: Date) => {
     if (appointment) {
-        setAppointmentFormData({ ...appointment, date: appointment.date });
+        setAppointmentFormData({ ...appointment, date: appointment.date, userIds: appointment.userIds || [] });
     } else {
         const date = timeSlot || selectedDate;
-        setAppointmentFormData({ ...emptyAppointment, date });
+        setAppointmentFormData({ ...emptyAppointment, date, userIds: [] });
     }
     setIsAppointmentDialogOpen(true);
   };
@@ -157,7 +157,7 @@ export default function DashboardPage() {
   
   const handleSaveAppointment = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!appointmentFormData.title || appointmentFormData.userIds.length === 0 || !appointmentFormData.date) {
+    if (!appointmentFormData.title || (appointmentFormData.userIds || []).length === 0 || !appointmentFormData.date) {
         toast({ title: 'Campos obrigatórios', description: 'Título, horário e ao menos um responsável são necessários.', variant: 'destructive' });
         return;
     }
@@ -536,8 +536,8 @@ export default function DashboardPage() {
                                 role="combobox"
                                 className="w-full justify-between"
                             >
-                                {appointmentFormData.userIds.length > 0
-                                ? `${appointmentFormData.userIds.length} selecionado(s)`
+                                {(appointmentFormData.userIds || []).length > 0
+                                ? `${(appointmentFormData.userIds || []).length} selecionado(s)`
                                 : "Selecione os membros..."}
                                 <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                             </Button>
@@ -553,9 +553,10 @@ export default function DashboardPage() {
                                         key={user.id}
                                         onSelect={() => {
                                         setAppointmentFormData(p => {
-                                            const newIds = p.userIds.includes(user.id)
-                                            ? p.userIds.filter(id => id !== user.id)
-                                            : [...p.userIds, user.id];
+                                            const currentIds = p.userIds || [];
+                                            const newIds = currentIds.includes(user.id)
+                                            ? currentIds.filter(id => id !== user.id)
+                                            : [...currentIds, user.id];
                                             return {...p, userIds: newIds};
                                         })
                                         }}
@@ -563,7 +564,7 @@ export default function DashboardPage() {
                                         <Check
                                         className={cn(
                                             "mr-2 h-4 w-4",
-                                            appointmentFormData.userIds.includes(user.id) ? "opacity-100" : "opacity-0"
+                                            (appointmentFormData.userIds || []).includes(user.id) ? "opacity-100" : "opacity-0"
                                         )}
                                         />
                                         {user.name}
@@ -575,7 +576,7 @@ export default function DashboardPage() {
                             </PopoverContent>
                         </Popover>
                         <div className="pt-2 flex flex-wrap gap-1">
-                            {appointmentFormData.userIds.map(id => {
+                            {(appointmentFormData.userIds || []).map(id => {
                                 const user = users.find(u => u.id === id);
                                 return user ? <Badge key={id} variant="secondary">{user.name}</Badge> : null;
                             })}
@@ -597,9 +598,9 @@ export default function DashboardPage() {
                     </div>
                      <div>
                         <Label htmlFor="notes">Notas (Opcional)</Label>
-                        <Textarea id="notes" value={appointmentFormData.notes} onChange={e => setAppointmentFormData(p => ({...p, notes: e.target.value}))} />
+                        <Textarea id="notes" value={appointmentFormData.notes || ''} onChange={e => setAppointmentFormData(p => ({...p, notes: e.target.value}))} />
                     </div>
-                    <DialogFooter className="justify-between">
+                    <DialogFooter className="justify-between pt-4">
                          {appointmentFormData.id ? (
                             <AlertDialog>
                                 <AlertDialogTrigger asChild>
