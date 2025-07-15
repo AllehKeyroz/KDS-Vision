@@ -1,11 +1,11 @@
-# 1. Etapa de dependências (base)
+# 1. Etapa base: instalação de dependências
 FROM node:20-alpine AS base
 WORKDIR /app
 
-# Copia apenas arquivos de dependência
+# Copia arquivos de dependência
 COPY package.json package-lock.json* ./
 
-# Instala dependências em ambiente limpo
+# Instala dependências
 RUN npm ci
 
 # 2. Etapa de build
@@ -15,13 +15,14 @@ WORKDIR /app
 # Copia o restante do código-fonte
 COPY . .
 
-# Desativa telemetria do Next.js
-ENV NEXT_TELEMETRY_DISABLED=1
+# Garante que a pasta public exista (evita erro no COPY)
+RUN mkdir -p /app/public
 
-# Executa o build
+# Desativa telemetria e faz o build
+ENV NEXT_TELEMETRY_DISABLED=1
 RUN npm run build
 
-# 3. Etapa final: produção
+# 3. Etapa de produção
 FROM node:20-alpine AS runner
 WORKDIR /app
 
@@ -30,23 +31,19 @@ ENV NEXT_TELEMETRY_DISABLED=1
 ENV PORT=3000
 ENV HOSTNAME=0.0.0.0
 
-# Cria usuário não-root
+# Cria usuário com menos privilégios
 RUN addgroup --system --gid 1001 nodejs \
   && adduser --system --uid 1001 nextjs
 
-# Copia arquivos necessários da build
+# Copia artefatos da build
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
-
-# Copia pasta public (opcional)
-RUN mkdir -p ./public
 COPY --from=builder --chown=nextjs:nodejs /app/public ./public
 
-# Usa o usuário com permissão restrita
+# Usa usuário seguro
 USER nextjs
 
-# Expõe porta padrão do Next.js
 EXPOSE 3000
 
-# Comando para rodar o app em produção
+# Inicia o servidor Next.js standalone
 CMD ["node", "server.js"]
