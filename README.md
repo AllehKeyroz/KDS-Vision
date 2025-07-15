@@ -24,22 +24,41 @@ KDS-Vision é uma plataforma de gerenciamento completa, projetada para agências
 
 ## 🚀 Roadmap de Novas Funcionalidades
 
-Abaixo estão as próximas grandes funcionalidades planejadas para o KDS-Vision.
+Esta é a visão estratégica para transformar o KDS-Vision no sistema operacional definitivo para agências digitais.
 
-### 1. Módulo Financeiro e de Projetos (Foco em Lucratividade) - *Em Desenvolvimento*
+### Módulo 1: Estratégia e Planejamento (O Cérebro da Agência)
 
-- [x] **Time Tracking por Tarefa (Base)**: Permite registrar o total de horas gastas em cada tarefa.
-- [x] **Relatório de Rentabilidade (Base)**: Usa um "Custo Estimado" para calcular uma margem de lucro inicial do projeto.
-- [ ] **Próximo Passo: Time Tracking por Usuário e Custo por Hora**: Adicionar um custo/hora para cada membro da equipe e associar as horas registradas a um usuário para calcular o custo real e a rentabilidade precisa do projeto.
-- [ ] **Contratos e Retainers (Recorrência)**: Módulo para gerenciar contratos de fee mensal e automatizar o lançamento de receitas recorrentes.
+- [ ] **1.1. Diagnóstico de Marketing 360°:** Ferramenta guiada para analisar os "4 Ps" do cliente, gerando um score de maturidade e um roadmap de ações.
+- [ ] **1.2. Construtor de Persona e ICP:** Módulo para criar e documentar o Perfil de Cliente Ideal e as Personas, que se tornam a base para todas as campanhas.
+- [ ] **1.3. Mapa de Jornada do Cliente:** Ferramenta visual para mapear todos os pontos de contato do cliente com a marca, identificando oportunidades.
+- [ ] **1.4. Planejador Estratégico Anual/Trimestral:** Local para definir OKRs, alocar orçamento e planejar as principais campanhas e iniciativas.
 
-### 2. Comunicação e Relacionamento com o Cliente (Foco em Retenção) - *Planejado*
+### Módulo 2: Operações e Execução (Os Músculos da Agência)
 
-- [ ] **Portal do Cliente (Client-Facing)**: Uma área para o cliente fazer login, acompanhar o progresso de seus projetos e acessar arquivos.
-- [ ] **Relatórios Automatizados de Desempenho**: Integração com APIs (Google, Meta) para gerar relatórios automáticos de desempenho para os clientes.
+- [ ] **2.1. Gestão de Funis de Vendas e Marketing:** Ferramenta visual (Kanban) para construir e gerenciar funis completos, conectando etapas com campanhas e tarefas.
+- [ ] **2.2. Calendário de Conteúdo Centralizado:** Calendário editorial que integra ideias de IA com planejamento, agendamento e status de aprovação.
+- [ ] **2.3. Banco de Ativos Digitais (DAM):** Local para armazenar, versionar e aprovar criativos, logos, vídeos e documentos.
+- [ ] **2.4. Gestão de Campanhas de Mídia Paga:** Evoluir o "Ads IA Creator" para acompanhar status e orçamento das campanhas.
+
+### Módulo 3: Relacionamento e Colaboração (O Coração da Agência)
+
+- [ ] **3.1. Portal do Cliente:** Área de login para o cliente acompanhar progresso, aprovar tarefas e acessar arquivos.
+- [ ] **3.2. Relatórios Automatizados de Desempenho:** Integração com APIs (Google, Meta) para gerar relatórios automáticos de desempenho.
+- [ ] **3.3. Sistema de Aprovação Integrado:** Fluxo onde o cliente pode aprovar ou solicitar revisões em tarefas e criativos diretamente na plataforma.
+
+### Módulo 4: Análise e Inteligência (A Prova de Valor)
+
+- [ ] **4.1. Dashboard de ROI por Cliente:** Painel que cruza o investimento (serviços + mídia) com os resultados gerados (leads, vendas) para calcular o ROI.
+- [ ] **4.2. Análise de Rentabilidade da Agência:** Dashboard que consolida a lucratividade de todos os projetos e clientes.
+- [ ] **4.3. Benchmarking de Performance:** Ferramenta que compara o desempenho de campanhas com a média de outros clientes no mesmo nicho.
+
+### Módulo 5: Gestão Interna da Agência (A Espinha Dorsal)
+
+- [x] **5.1. Gestão de Propostas e Contratos (Base):** Módulo para criar propostas comerciais e contratos recorrentes.
+- [ ] **5.2. Alocação de Recursos e Capacity Planning:** Painel que mostra a carga de trabalho de cada membro da equipe para ajudar na distribuição de tarefas.
+- [ ] **5.3. Base de Conhecimento Interna (Wiki):** Evoluir os "Processos" para uma wiki completa com documentação de ferramentas e melhores práticas.
 
 ---
-
 
 ## Stack de Tecnologia
 

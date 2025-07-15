@@ -14,6 +14,18 @@ export type Prospect = {
   createdAt?: Timestamp;
 };
 
+export type Proposal = {
+    id: string;
+    clientId: string;
+    clientName: string;
+    title: string;
+    scope: string;
+    value: number;
+    status: 'Rascunho' | 'Enviada' | 'Aceita' | 'Recusada';
+    createdAt?: any;
+    validUntil?: any;
+};
+
 export type Client = {
   id: string;
   name: string;

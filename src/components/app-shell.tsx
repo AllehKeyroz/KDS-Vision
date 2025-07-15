@@ -2,7 +2,7 @@
 'use client';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Briefcase, LayoutDashboard, Users, Search, Folder, Megaphone, Presentation, Settings, Users2, Building, DollarSign } from 'lucide-react';
+import { Briefcase, LayoutDashboard, Users, Search, Folder, Megaphone, Presentation, Settings, Users2, Building, DollarSign, FileText } from 'lucide-react';
 import {
   SidebarProvider,
   Sidebar,
@@ -54,6 +54,17 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   <span>Clientes</span>
                 </SidebarMenuButton>
               </Link>
+            </SidebarMenuItem>
+             <SidebarMenuItem>
+                <Link href="/proposals">
+                    <SidebarMenuButton
+                    isActive={pathname.startsWith('/proposals')}
+                    tooltip="Propostas"
+                    >
+                    <FileText />
+                    <span>Propostas</span>
+                    </SidebarMenuButton>
+                </Link>
             </SidebarMenuItem>
             <SidebarMenuItem>
                 <Link href="/prospects">
