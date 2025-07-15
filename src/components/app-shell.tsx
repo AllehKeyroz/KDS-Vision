@@ -2,7 +2,7 @@
 'use client';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Briefcase, LayoutDashboard, Users, Search, Folder, Megaphone, Presentation, Settings, Users2 } from 'lucide-react';
+import { Briefcase, LayoutDashboard, Users, Search, Folder, Megaphone, Presentation, Settings, Users2, Building } from 'lucide-react';
 import {
   SidebarProvider,
   Sidebar,
@@ -76,6 +76,17 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   <span>Equipe</span>
                 </SidebarMenuButton>
               </Link>
+            </SidebarMenuItem>
+             <SidebarMenuItem>
+                <Link href="/agency">
+                    <SidebarMenuButton
+                    isActive={pathname.startsWith('/agency')}
+                    tooltip="Agência"
+                    >
+                    <Building />
+                    <span>Agência</span>
+                    </SidebarMenuButton>
+                </Link>
             </SidebarMenuItem>
              <SidebarMenuItem>
               <SidebarMenuButton
