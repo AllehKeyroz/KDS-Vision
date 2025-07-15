@@ -1,44 +1,43 @@
 'use server';
 /**
- * @fileOverview A flow to scrape prospect data from Google Maps using Outscraper.
+ * @fileOverview A flow to scrape prospect data from Google Maps using Google Places API.
  *
- * - prospectScraper - A function that scrapes prospect data based on a query and limit.
+ * - prospectScraper - A function that scrapes prospect data based on a query.
  * - ProspectScraperInput - The input type for the prospectScraper function.
  * - ProspectScraperOutput - The return type for the prospectScraper function.
  */
 
 import { ai } from '@/ai/genkit';
-import { z } from 'genkit';
+import { z } from 'zod';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 
-// Input Schema
+// Input Schema - limit is removed as Google API has its own pagination
 const ProspectScraperInputSchema = z.object({
   query: z.string().describe('The search query for prospects (e.g., "restaurants in New York").'),
-  limit: z.number().int().min(1).max(100).describe('The number of prospects to scrape.'),
 });
 export type ProspectScraperInput = z.infer<typeof ProspectScraperInputSchema>;
 
-// Output Schema
+// Output Schema - Adjusted for Google Places API response
 const ScrapedProspectSchema = z.object({
     name: z.string().describe("The name of the business."),
-    contact: z.string().describe("The primary contact information (phone or email)."),
-    phones: z.string().optional().describe("The phone number(s) of the business."),
-    emails: z.string().optional().describe("The email address(es) of the business."),
+    address: z.string().describe("The formatted address of the business."),
+    rating: z.number().optional().describe("The user rating of the business."),
+    contact: z.string().describe("Primary contact info (website or phone)."), // a more generic contact field
 });
 
 const ProspectScraperOutputSchema = z.array(ScrapedProspectSchema);
 export type ProspectScraperOutput = z.infer<typeof ProspectScraperOutputSchema>;
 
 
-async function getOutscraperApiKey(): Promise<string> {
-    const docRef = doc(db, 'agency', 'internal', 'api_keys', 'outscraper');
+async function getGoogleMapsApiKey(): Promise<string> {
+    const docRef = doc(db, 'agency', 'internal', 'api_keys', 'google_maps');
     const docSnap = await getDoc(docRef);
 
     if (docSnap.exists() && docSnap.data().key) {
         return docSnap.data().key;
     } else {
-        throw new Error('Outscraper API key not found. Please add it in the Agency panel.');
+        throw new Error('Google Maps API key not found. Please add it in the Agency panel.');
     }
 }
 
@@ -53,40 +52,37 @@ const prospectScraperFlow = ai.defineFlow(
     inputSchema: ProspectScraperInputSchema,
     outputSchema: ProspectScraperOutputSchema,
   },
-  async ({ query, limit }) => {
-    const apiKey = await getOutscraperApiKey();
-    const headers = {
-        'X-API-KEY': apiKey,
-    };
+  async ({ query }) => {
+    const apiKey = await getGoogleMapsApiKey();
     
-    // Using the Google Maps Scraper endpoint from Outscraper
-    const url = new URL('https://api.outscraper.com/maps/search');
+    // Using the Google Places API - Text Search
+    const url = new URL('https://maps.googleapis.com/maps/api/place/textsearch/json');
     url.searchParams.append('query', query);
-    url.searchParams.append('limit', String(limit));
-    url.searchParams.append('async', 'false'); // Ensures synchronous response
+    url.searchParams.append('key', apiKey);
+    url.searchParams.append('language', 'pt-BR'); // Optional: get results in Brazilian Portuguese
 
     try {
-        const response = await fetch(url.toString(), { headers });
-
-        if (!response.ok) {
-            const errorBody = await response.json();
-            throw new Error(`Outscraper API error: ${errorBody.message || response.statusText}`);
-        }
-
+        const response = await fetch(url.toString());
         const result = await response.json();
 
-        // The data is nested under a 'data' array, and each of those has a results array
-        const businesses = result.data.flat().map((item: any) => ({
+        if (result.status !== 'OK') {
+             throw new Error(`Google Places API error: ${result.status} - ${result.error_message || 'An error occurred.'}`);
+        }
+
+        // The data is in the 'results' array
+        const businesses = result.results.map((item: any) => ({
             name: item.name || 'N/A',
-            contact: item.phones?.[0] || item.emails?.[0] || 'N/A',
-            phones: item.phones?.join(', ') || undefined,
-            emails: item.emails?.join(', ') || undefined,
+            address: item.formatted_address || 'N/A',
+            rating: item.rating || undefined,
+            // Google Places API doesn't provide email. We can try to get website or phone.
+            // A full implementation might fetch Place Details for more info, but that's a separate, more expensive call.
+            contact: item.website || item.formatted_phone_number || 'N/A', 
         }));
         
         return businesses;
 
     } catch (error) {
-        console.error("Error calling Outscraper API:", error);
+        console.error("Error calling Google Places API:", error);
         throw error; // Re-throw the error to be caught by the client
     }
   }

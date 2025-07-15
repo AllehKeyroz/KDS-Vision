@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import type { Prospect } from "@/lib/types";
-import { PlusCircle, Loader2, MoreVertical, Edit, Trash2, Wand2 } from "lucide-react";
+import { PlusCircle, Loader2, MoreVertical, Edit, Trash2, Wand2, Star } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogTrigger, DialogClose } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -19,7 +19,12 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { format } from 'date-fns';
 import { runProspectScraper } from '@/app/actions';
 
-type ScrapedProspect = Omit<Prospect, 'id' | 'stage' | 'createdAt' | 'nextFollowUp'> & { phones?: string; emails?: string };
+type ScrapedProspect = {
+    name: string;
+    address: string;
+    rating?: number;
+    contact: string;
+};
 
 export default function ProspectsPage() {
     const [prospects, setProspects] = useState<Prospect[]>([]);
@@ -31,7 +36,7 @@ export default function ProspectsPage() {
 
     // State for the scraper
     const [isScraping, setIsScraping] = useState(false);
-    const [scrapeQuery, setScrapeQuery] = useState({ query: '', location: '', limit: 10 });
+    const [scrapeQuery, setScrapeQuery] = useState({ query: '', location: '' });
     const [scrapedResults, setScrapedResults] = useState<ScrapedProspect[]>([]);
 
     const prospectsCollectionRef = useMemo(() => collection(db, 'prospects'), []);
@@ -116,7 +121,6 @@ export default function ProspectsPage() {
         try {
             const results = await runProspectScraper({
                 query: `${scrapeQuery.query} em ${scrapeQuery.location}`,
-                limit: scrapeQuery.limit
             });
             setScrapedResults(results);
             toast({ title: 'Busca Concluída!', description: `${results.length} prospects encontrados.` });
@@ -134,7 +138,7 @@ export default function ProspectsPage() {
         const promises = scrapedResults.map(prospect => {
             const newProspect: Omit<Prospect, 'id'> = {
                 name: prospect.name,
-                contact: prospect.phones || prospect.emails || 'N/A', // Prioritize phone, then email
+                contact: prospect.contact, // Use the generic contact field
                 stage: 'Contato Inicial',
                 createdAt: serverTimestamp(),
             };
@@ -167,10 +171,10 @@ export default function ProspectsPage() {
             <Card>
                 <CardHeader>
                     <CardTitle className="font-headline">Prospecção Automática com IA</CardTitle>
-                    <CardDescription>Use o web scraping para encontrar novos leads. Requer uma chave de API da Outscraper no painel da agência.</CardDescription>
+                    <CardDescription>Use o Google Places API para encontrar novos leads. Requer uma chave de API do Google Maps no painel da agência.</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="space-y-2">
                             <Label htmlFor="query">Nicho / Termo de Busca</Label>
                             <Input id="query" value={scrapeQuery.query} onChange={e => setScrapeQuery({...scrapeQuery, query: e.target.value})} placeholder="Ex: Restaurantes, Advogados" />
@@ -179,14 +183,10 @@ export default function ProspectsPage() {
                             <Label htmlFor="location">Localização</Label>
                             <Input id="location" value={scrapeQuery.location} onChange={e => setScrapeQuery({...scrapeQuery, location: e.target.value})} placeholder="Ex: São Paulo, Brasil" />
                         </div>
-                        <div className="space-y-2">
-                            <Label htmlFor="limit">Quantidade</Label>
-                            <Input id="limit" type="number" value={scrapeQuery.limit} onChange={e => setScrapeQuery({...scrapeQuery, limit: parseInt(e.target.value, 10) || 1})} min="1" max="100"/>
-                        </div>
                     </div>
                     <Button onClick={handleScrape} disabled={isScraping}>
                         {isScraping ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Wand2 className="mr-2 h-4 w-4" />}
-                        {isScraping ? 'Buscando Prospects...' : 'Buscar Prospects com IA'}
+                        {isScraping ? 'Buscando Prospects...' : 'Buscar Prospects com Google'}
                     </Button>
                 </CardContent>
             </Card>
@@ -208,16 +208,20 @@ export default function ProspectsPage() {
                             <TableHeader>
                                 <TableRow>
                                     <TableHead>Nome</TableHead>
-                                    <TableHead>Telefone(s)</TableHead>
-                                    <TableHead>Email(s)</TableHead>
+                                    <TableHead>Endereço</TableHead>
+                                    <TableHead>Contato (Site/Telefone)</TableHead>
+                                    <TableHead>Avaliação</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
                                 {scrapedResults.map((prospect, index) => (
                                     <TableRow key={index}>
                                         <TableCell className="font-medium">{prospect.name}</TableCell>
-                                        <TableCell>{prospect.phones || 'N/A'}</TableCell>
-                                        <TableCell>{prospect.emails || 'N/A'}</TableCell>
+                                        <TableCell>{prospect.address}</TableCell>
+                                        <TableCell>{prospect.contact}</TableCell>
+                                        <TableCell className="flex items-center gap-1">
+                                            {prospect.rating ? <> <Star className="h-4 w-4 text-yellow-400 fill-yellow-400" /> {prospect.rating.toFixed(1)} </> : 'N/A'}
+                                        </TableCell>
                                     </TableRow>
                                 ))}
                             </TableBody>
@@ -314,7 +318,7 @@ export default function ProspectsPage() {
                             <Input id="name" name="name" defaultValue={currentProspect?.name} required />
                         </div>
                         <div>
-                            <Label htmlFor="contact">Contato (Telefone/Email)</Label>
+                            <Label htmlFor="contact">Contato (Telefone/Email/Site)</Label>
                             <Input id="contact" name="contact" defaultValue={currentProspect?.contact} required />
                         </div>
                          <div>

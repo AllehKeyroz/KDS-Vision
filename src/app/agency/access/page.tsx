@@ -5,7 +5,7 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
-import { Copy, PlusCircle, Trash2, Save, Loader2, KeyRound, Bot } from 'lucide-react';
+import { Copy, PlusCircle, Trash2, Save, Loader2, KeyRound, Bot, Map } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
@@ -25,7 +25,7 @@ import {
 } from "@/components/ui/alert-dialog"
 
 const agencyAccessCollectionRef = collection(db, 'agency', 'internal', 'access');
-const apiKeysCollectionRef = doc(db, 'agency', 'internal', 'api_keys', 'outscraper');
+const apiKeysCollectionRef = doc(db, 'agency', 'internal', 'api_keys', 'google_maps');
 
 export default function AgencyAccessPage() {
     const { toast } = useToast();
@@ -35,7 +35,7 @@ export default function AgencyAccessPage() {
     const [isSavingAccess, setIsSavingAccess] = useState(false);
     const [isSavingApiKey, setIsSavingApiKey] = useState(false);
     const [accessFormData, setAccessFormData] = useState({ platform: '', link: '', login: '', password_plain: '', apiKey: '' });
-    const [outscraperApiKey, setOutscraperApiKey] = useState('');
+    const [googleMapsApiKey, setGoogleMapsApiKey] = useState('');
 
     useEffect(() => {
         setIsLoading(true);
@@ -54,7 +54,7 @@ export default function AgencyAccessPage() {
         const fetchApiKey = async () => {
              const docSnap = await getDoc(apiKeysCollectionRef);
              if (docSnap.exists()) {
-                 setOutscraperApiKey(docSnap.data().key || '');
+                 setGoogleMapsApiKey(docSnap.data().key || '');
              }
              setIsLoading(false);
         };
@@ -120,8 +120,8 @@ export default function AgencyAccessPage() {
         e.preventDefault();
         setIsSavingApiKey(true);
         try {
-            await setDoc(apiKeysCollectionRef, { key: outscraperApiKey });
-            toast({ title: "Chave de API Salva!", description: "Sua chave da Outscraper foi salva com sucesso." });
+            await setDoc(apiKeysCollectionRef, { key: googleMapsApiKey });
+            toast({ title: "Chave de API Salva!", description: "Sua chave da Google Maps foi salva com sucesso." });
         } catch (error) {
             console.error("Error saving API key:", error);
             toast({ title: "Erro ao salvar chave", variant: "destructive" });
@@ -134,15 +134,15 @@ export default function AgencyAccessPage() {
         <div className="space-y-6">
             <Card>
                 <CardHeader>
-                    <CardTitle>Chaves de API</CardTitle>
-                    <CardDescription>Gerencie as chaves de API para integrações de terceiros.</CardDescription>
+                    <CardTitle className="flex items-center gap-2"><Map />Chaves de API</CardTitle>
+                    <CardDescription>Gerencie as chaves de API para integrações de terceiros, como a Prospecção Automática.</CardDescription>
                 </CardHeader>
                 <CardContent>
                     <form onSubmit={handleApiKeySubmit} className="space-y-4">
                          <div className="space-y-1">
-                            <Label htmlFor="outscraperApiKey">Outscraper API Key</Label>
+                            <Label htmlFor="googleMapsApiKey">Google Maps API Key</Label>
                             <div className="flex gap-2">
-                                <Input id="outscraperApiKey" type="password" placeholder="Cole sua chave de API aqui" value={outscraperApiKey} onChange={(e) => setOutscraperApiKey(e.target.value)} />
+                                <Input id="googleMapsApiKey" type="password" placeholder="Cole sua chave de API do Google Cloud aqui" value={googleMapsApiKey} onChange={(e) => setGoogleMapsApiKey(e.target.value)} />
                                 <Button type="submit" variant="secondary" disabled={isSavingApiKey}>
                                     {isSavingApiKey ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
                                     Salvar Chave
