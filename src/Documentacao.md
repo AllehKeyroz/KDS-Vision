@@ -8,7 +8,7 @@ Este documento serve como um raio-x do estado atual do projeto, detalhando as fu
 | ID    | Módulo                       | Status      | Funcionalidade                                                                                                         |
 | :---- | :--------------------------- | :---------- | :--------------------------------------------------------------------------------------------------------------------- |
 | **1.1** | Estratégia e Planejamento      |  পেন্ডিং | Diagnóstico de Marketing 360°                                                                                          |
-| **1.2** | Estratégia e Planejamento      | পেন্ডিং | Construtor de Persona e ICP                                                                                            |
+| **1.2** | Estratégia e Planejamento      | **Concluído** | Construtor de Persona e ICP - Base (Contexto do Cliente)                                                              |
 | **1.3** | Estratégia e Planejamento      | পেন্ডিং | Mapa de Jornada do Cliente                                                                                             |
 | **1.4** | Estratégia e Planejamento      | পেন্ডিং | Planejador Estratégico Anual/Trimestral                                                                                |
 | **2.1** | Operações e Execução           | পেন্ডিং | Gestão de Funis de Vendas e Marketing                                                                                  |
@@ -45,6 +45,10 @@ Este documento serve como um raio-x do estado atual do projeto, detalhando as fu
   - **Componentes:** `Table`, `Dialog`, `Avatar`.
 
 #### Módulos do Cliente (`/src/app/clients/[clientId]/...`)
+- **(ID 1.2) Contexto do Cliente (`/src/app/clients/[clientId]/page.tsx`):**
+  - **Descrição:** Área para centralizar informações sobre a empresa, branding, produtos e marketing (incluindo o público-alvo/ICP). Serve como base para as ferramentas de IA.
+  - **Componentes:** `Tabs`, `Textarea`, `Input`, `Button`.
+
 - **Gestão de Projetos (`.../projects/page.tsx` e `.../projects/[projectId]/page.tsx`):**
   - **Descrição:** Permite criar projetos com escopo, valor e status. Dentro de um projeto, é possível criar seções e tarefas. Cada tarefa pode ser marcada como concluída e ter responsáveis e prazo. A página de detalhes do projeto calcula o progresso com base nas tarefas concluídas.
   - **(ID 5.2) Time Tracking e Análise Financeira:** Cada tarefa permite o registro de horas por membros da equipe. A página de detalhes do projeto exibe um card de "Análise Financeira" que calcula o custo real (baseado no custo/hora do membro) e a margem de lucro do projeto.
@@ -83,9 +87,8 @@ Este documento serve como um raio-x do estado atual do projeto, detalhando as fu
 
 ### 🔲 Funcionalidades Pendentes (Próximos Passos)
 
-1.  **Módulo 1: Estratégia e Planejamento (O Cérebro da Agência)** - **NÃO INICIADO**
+1.  **Módulo 1: Estratégia e Planejamento (O Cérebro da Agência)**
     - `1.1. Diagnóstico de Marketing 360°:` Criar um formulário guiado (wizard) para analisar os 4Ps do marketing do cliente. O resultado deve ser um score e um relatório inicial.
-    - `1.2. Construtor de Persona e ICP:` Criar uma nova área no cliente para documentar personas e o Perfil de Cliente Ideal, com campos estruturados.
     - `1.3. Mapa de Jornada do Cliente:` Desenvolver uma ferramenta visual (possivelmente usando uma biblioteca de diagramas) para mapear os pontos de contato do cliente.
     - `1.4. Planejador Estratégico:` Criar uma nova seção para definir OKRs (Objetivos e Resultados-Chave) e alocar orçamentos para períodos específicos (trimestre/ano).
 
