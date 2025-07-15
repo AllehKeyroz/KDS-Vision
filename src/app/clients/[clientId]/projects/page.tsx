@@ -1,3 +1,4 @@
+
 'use client'
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
@@ -59,10 +60,11 @@ export default function ProjectsPage() {
         event.preventDefault();
         setIsSaving(true);
         const formData = new FormData(event.currentTarget);
-        const projectData: Omit<Project, 'id' | 'createdAt' | 'sections'> = {
+        const projectData = {
             name: formData.get('name') as string,
             scope: formData.get('scope') as string,
             value: Number(formData.get('value')),
+            cost: Number(formData.get('cost') || 0),
             status: formData.get('status') as Project['status'],
         };
 
@@ -202,8 +204,14 @@ export default function ProjectsPage() {
                                 <Input id="value" name="value" type="number" step="0.01" defaultValue={currentProject?.value} required />
                             </div>
                             <div>
+                                <Label htmlFor="cost">Custo Estimado (R$)</Label>
+                                <Input id="cost" name="cost" type="number" step="0.01" defaultValue={currentProject?.cost || ''} placeholder="Opcional" />
+                            </div>
+                        </div>
+                         <div className="grid grid-cols-1">
+                            <div>
                                 <Label htmlFor="status">Status</Label>
-                                <Select name="status" defaultValue={currentProject?.status}>
+                                <Select name="status" defaultValue={currentProject?.status || 'Planejamento'}>
                                     <SelectTrigger id="status">
                                         <SelectValue placeholder="Selecione o status" />
                                     </SelectTrigger>

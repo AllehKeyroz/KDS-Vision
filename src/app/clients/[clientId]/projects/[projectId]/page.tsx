@@ -1,3 +1,4 @@
+
 'use client'
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -10,7 +11,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Progress } from '@/components/ui/progress';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
-import { PlusCircle, Loader2, Trash2, GripVertical, Check, X, Pencil, CheckCircle2, ArrowLeft, CalendarIcon, Filter, User } from 'lucide-react';
+import { PlusCircle, Loader2, Trash2, GripVertical, Check, X, Pencil, CheckCircle2, ArrowLeft, CalendarIcon, Filter, User, Clock, DollarSign, BarChart2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { db } from '@/lib/firebase';
 import { collection, onSnapshot, doc, updateDoc, arrayUnion, arrayRemove, getDoc, Timestamp } from 'firebase/firestore';
@@ -28,7 +29,9 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
+import { Dialog, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogContent, DialogClose } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Badge } from '@/components/ui/badge';
 
 export default function ProjectDetailPage() {
     const params = useParams();
@@ -45,6 +48,11 @@ export default function ProjectDetailPage() {
     
     const [users, setUsers] = useState<AppUser[]>([]);
     const [filters, setFilters] = useState({ responsible: '', deadline: null as Date | null });
+    
+    // Time tracking state
+    const [isTimeLogDialogOpen, setIsTimeLogDialogOpen] = useState(false);
+    const [timeLogData, setTimeLogData] = useState<{ taskId: string; currentHours: number }>({ taskId: '', currentHours: 0 });
+
 
     const projectDocRef = useMemo(() => doc(db, 'clients', clientId as string, 'projects', projectId as string), [clientId, projectId]);
     const usersCollectionRef = useMemo(() => collection(db, 'users'), []);
@@ -77,6 +85,18 @@ export default function ProjectDetailPage() {
             unsubscribeUsers();
         };
     }, [projectDocRef, router, toast, clientId, usersCollectionRef]);
+    
+    const projectAnalysis = useMemo(() => {
+        if (!project) return { totalLoggedHours: 0, profitMargin: 0 };
+        const totalLoggedHours = project.sections?.reduce((acc, section) => {
+            return acc + (section.tasks || []).reduce((taskAcc, task) => taskAcc + (task.loggedHours || 0), 0);
+        }, 0) || 0;
+        
+        const profitMargin = project.value - (project.cost || 0);
+
+        return { totalLoggedHours, profitMargin };
+    }, [project]);
+
 
     const calculateProgress = () => {
         if (!project || !project.sections) return 0;
@@ -112,6 +132,7 @@ export default function ProjectDetailPage() {
             text: taskInput.text.trim(),
             responsible: taskInput.responsible.trim(),
             completed: false,
+            loggedHours: 0,
             ...(taskInput.deadline && { deadline: Timestamp.fromDate(taskInput.deadline) })
         };
         
@@ -152,6 +173,32 @@ export default function ProjectDetailPage() {
         }));
         await updateDoc(projectDocRef, { sections: updatedSections });
     };
+    
+    const handleOpenTimeLogDialog = (taskId: string, currentHours: number) => {
+        setTimeLogData({ taskId, currentHours });
+        setIsTimeLogDialogOpen(true);
+    };
+
+    const handleLogTime = async (event: React.FormEvent<HTMLFormElement>) => {
+        event.preventDefault();
+        const formData = new FormData(event.currentTarget);
+        const hoursToAdd = Number(formData.get('hours'));
+
+        if (isNaN(hoursToAdd) || hoursToAdd <= 0) {
+            toast({ title: "Valor inválido", description: "Por favor, insira um número de horas válido.", variant: "destructive" });
+            return;
+        }
+
+        const updatedSections = project?.sections?.map(s => ({
+            ...s,
+            tasks: s.tasks.map(t => t.id === timeLogData.taskId ? { ...t, loggedHours: (t.loggedHours || 0) + hoursToAdd } : t)
+        }));
+
+        await updateDoc(projectDocRef, { sections: updatedSections });
+        toast({ title: "Horas Registradas!", description: `${hoursToAdd}h adicionadas à tarefa.` });
+        setIsTimeLogDialogOpen(false);
+    };
+
 
     const filteredSections = useMemo(() => {
         if (!project || !project.sections) return [];
@@ -186,80 +233,112 @@ export default function ProjectDetailPage() {
                 Voltar para Projetos
             </Button>
 
-            <Card>
-                <CardHeader>
-                    <div className="flex justify-between items-start">
-                        <div>
-                            <CardTitle className="font-headline text-3xl flex items-center gap-2">
-                                {isCompleted && <CheckCircle2 className="h-8 w-8 text-green-500" />}
-                                {project.name}
-                            </CardTitle>
-                            <CardDescription>Escopo: {project.scope}</CardDescription>
-                        </div>
-                        <div className="text-right">
-                           <p className="text-lg font-bold">R$ {project.value.toFixed(2)}</p>
-                           <p className="text-sm text-muted-foreground">{project.status}</p>
-                        </div>
-                    </div>
-                </CardHeader>
-                <CardContent>
-                    <Label className="text-xs">Progresso</Label>
-                    <div className="flex items-center gap-2">
-                        <Progress value={progress} />
-                        <span className="text-sm font-medium">{progress}%</span>
-                    </div>
-                </CardContent>
-            </Card>
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div className="lg:col-span-2 space-y-6">
+                    <Card>
+                        <CardHeader>
+                            <div className="flex justify-between items-start">
+                                <div>
+                                    <CardTitle className="font-headline text-3xl flex items-center gap-2">
+                                        {isCompleted && <CheckCircle2 className="h-8 w-8 text-green-500" />}
+                                        {project.name}
+                                    </CardTitle>
+                                    <CardDescription>Escopo: {project.scope}</CardDescription>
+                                </div>
+                                <div className="text-right">
+                                   <p className="text-lg font-bold">R$ {project.value.toFixed(2)}</p>
+                                   <Badge variant={isCompleted ? "default" : "secondary"} className={isCompleted ? "bg-green-500/20 text-green-400 border-green-500/30" : ""}>{project.status}</Badge>
+                                </div>
+                            </div>
+                        </CardHeader>
+                        <CardContent>
+                            <Label className="text-xs">Progresso</Label>
+                            <div className="flex items-center gap-2">
+                                <Progress value={progress} />
+                                <span className="text-sm font-medium">{progress}%</span>
+                            </div>
+                        </CardContent>
+                    </Card>
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2"><Filter className="h-5 w-5"/> Filtros</CardTitle>
+                        </CardHeader>
+                        <CardContent className="flex flex-col md:flex-row gap-4">
+                            <div className="flex-1 space-y-2">
+                                <Label>Responsável</Label>
+                                <Select onValueChange={(value) => setFilters(f => ({...f, responsible: value === 'all' ? '' : value}))}>
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="Filtrar por responsável..." />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="all">Todos</SelectItem>
+                                        {users.map(user => (
+                                            <SelectItem key={user.id} value={user.name}>{user.name}</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                             <div className="flex-1 space-y-2">
+                                <Label>Data de Entrega</Label>
+                                <Popover>
+                                    <PopoverTrigger asChild>
+                                        <Button
+                                        variant={"outline"}
+                                        className={cn(
+                                            "w-full justify-start text-left font-normal",
+                                            !filters.deadline && "text-muted-foreground"
+                                        )}
+                                        >
+                                        <CalendarIcon className="mr-2 h-4 w-4" />
+                                        {filters.deadline ? format(filters.deadline, "PPP") : <span>Escolha uma data</span>}
+                                        </Button>
+                                    </PopoverTrigger>
+                                    <PopoverContent className="w-auto p-0">
+                                        <Calendar
+                                        mode="single"
+                                        selected={filters.deadline as Date | undefined}
+                                        onSelect={(date) => setFilters(f => ({...f, deadline: date || null}))}
+                                        initialFocus
+                                        />
+                                    </PopoverContent>
+                                </Popover>
+                            </div>
+                            <div className="flex items-end">
+                                <Button variant="ghost" onClick={() => setFilters({ responsible: '', deadline: null })}>Limpar Filtros</Button>
+                            </div>
+                        </CardContent>
+                    </Card>
 
-            <Card>
-                <CardHeader>
-                    <CardTitle className="flex items-center gap-2"><Filter className="h-5 w-5"/> Filtros</CardTitle>
-                </CardHeader>
-                <CardContent className="flex flex-col md:flex-row gap-4">
-                    <div className="flex-1 space-y-2">
-                        <Label>Responsável</Label>
-                        <Select onValueChange={(value) => setFilters(f => ({...f, responsible: value === 'all' ? '' : value}))}>
-                            <SelectTrigger>
-                                <SelectValue placeholder="Filtrar por responsável..." />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="all">Todos</SelectItem>
-                                {users.map(user => (
-                                    <SelectItem key={user.id} value={user.name}>{user.name}</SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-                    </div>
-                     <div className="flex-1 space-y-2">
-                        <Label>Data de Entrega</Label>
-                        <Popover>
-                            <PopoverTrigger asChild>
-                                <Button
-                                variant={"outline"}
-                                className={cn(
-                                    "w-full justify-start text-left font-normal",
-                                    !filters.deadline && "text-muted-foreground"
-                                )}
-                                >
-                                <CalendarIcon className="mr-2 h-4 w-4" />
-                                {filters.deadline ? format(filters.deadline, "PPP") : <span>Escolha uma data</span>}
-                                </Button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-auto p-0">
-                                <Calendar
-                                mode="single"
-                                selected={filters.deadline as Date | undefined}
-                                onSelect={(date) => setFilters(f => ({...f, deadline: date || null}))}
-                                initialFocus
-                                />
-                            </PopoverContent>
-                        </Popover>
-                    </div>
-                    <div className="flex items-end">
-                        <Button variant="ghost" onClick={() => setFilters({ responsible: '', deadline: null })}>Limpar Filtros</Button>
-                    </div>
-                </CardContent>
-            </Card>
+                </div>
+
+                <div className="lg:col-span-1">
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2"><BarChart2 />Análise Financeira</CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                            <div className="flex justify-between items-center p-3 bg-secondary/50 rounded-md">
+                                <span className="font-medium text-sm">Valor do Projeto</span>
+                                <span className="font-bold text-green-400">R$ {project.value.toFixed(2)}</span>
+                            </div>
+                            <div className="flex justify-between items-center p-3 bg-secondary/50 rounded-md">
+                                <span className="font-medium text-sm">Custo Estimado</span>
+                                <span className="font-bold text-red-400">R$ {(project.cost || 0).toFixed(2)}</span>
+                            </div>
+                             <div className="flex justify-between items-center p-3 bg-secondary/50 rounded-md">
+                                <span className="font-medium text-sm">Horas Registradas</span>
+                                <span className="font-bold">{projectAnalysis.totalLoggedHours.toFixed(1)}h</span>
+                            </div>
+                            <div className="flex justify-between items-center p-3 bg-primary/10 rounded-md border border-primary/20">
+                                <span className="font-medium text-sm">Margem de Lucro</span>
+                                <span className={cn("font-bold text-lg", projectAnalysis.profitMargin >= 0 ? "text-primary" : "text-destructive")}>
+                                    R$ {projectAnalysis.profitMargin.toFixed(2)}
+                                </span>
+                            </div>
+                        </CardContent>
+                    </Card>
+                </div>
+            </div>
 
             <div className="space-y-4">
                  <div className="flex items-center gap-2">
@@ -310,30 +389,34 @@ export default function ProjectDetailPage() {
                                         </div>
                                     ) : (
                                         <label htmlFor={task.id} className={`flex-1 text-sm ${task.completed ? 'line-through text-muted-foreground' : ''}`}>
-                                            {task.text} 
-                                            {task.responsible && <span className="text-xs text-muted-foreground ml-2">({task.responsible})</span>}
-                                            {task.deadline && (
-                                                <span className={cn("text-xs bg-muted text-muted-foreground rounded px-1.5 py-0.5 ml-2", new Date(task.deadline.toDate()) < new Date() && !task.completed ? 'text-red-400 bg-red-900/50' : '')}>
-                                                    {format(task.deadline.toDate(), 'dd/MM/yy')}
-                                                </span>
-                                            )}
+                                            {task.text}
                                         </label>
                                     )}
-                                    <div className="opacity-0 group-hover:opacity-100 transition-opacity">
-                                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => {setEditingItemId(task.id); setEditingText(task.text)}}><Pencil className="h-3 w-3"/></Button>
-                                        <AlertDialog>
-                                            <AlertDialogTrigger asChild>
-                                                <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive"><Trash2 className="h-3 w-3"/></Button>
-                                            </AlertDialogTrigger>
-                                             <AlertDialogContent>
-                                                <AlertDialogHeader><AlertDialogTitle>Excluir Tarefa?</AlertDialogTitle></AlertDialogHeader>
-                                                <AlertDialogDescription>Essa ação não pode ser desfeita.</AlertDialogDescription>
-                                                <AlertDialogFooter>
-                                                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                                    <AlertDialogAction onClick={() => handleDeleteTask(task.id)}>Excluir</AlertDialogAction>
-                                                </AlertDialogFooter>
-                                            </AlertDialogContent>
-                                        </AlertDialog>
+                                    <div className="flex items-center gap-2 ml-auto">
+                                        {task.responsible && <Badge variant="outline" className="hidden sm:flex items-center gap-1"><User size={12}/>{task.responsible}</Badge>}
+                                        {task.deadline && (
+                                            <Badge variant="outline" className={cn("hidden sm:flex items-center gap-1", new Date(task.deadline.toDate()) < new Date() && !task.completed ? 'text-red-400 border-red-400/50' : '')}>
+                                                <CalendarIcon size={12}/>{format(task.deadline.toDate(), 'dd/MM/yy')}
+                                            </Badge>
+                                        )}
+                                        {(task.loggedHours || 0) > 0 && <Badge variant="secondary" className="flex items-center gap-1"><Clock size={12}/>{task.loggedHours}h</Badge>}
+                                        <div className="opacity-0 group-hover:opacity-100 transition-opacity">
+                                            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleOpenTimeLogDialog(task.id, task.loggedHours || 0)}><Clock className="h-3 w-3"/></Button>
+                                            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => {setEditingItemId(task.id); setEditingText(task.text)}}><Pencil className="h-3 w-3"/></Button>
+                                            <AlertDialog>
+                                                <AlertDialogTrigger asChild>
+                                                    <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive"><Trash2 className="h-3 w-3"/></Button>
+                                                </AlertDialogTrigger>
+                                                 <AlertDialogContent>
+                                                    <AlertDialogHeader><AlertDialogTitle>Excluir Tarefa?</AlertDialogTitle></AlertDialogHeader>
+                                                    <AlertDialogDescription>Essa ação não pode ser desfeita.</AlertDialogDescription>
+                                                    <AlertDialogFooter>
+                                                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                                        <AlertDialogAction onClick={() => handleDeleteTask(task.id)}>Excluir</AlertDialogAction>
+                                                    </AlertDialogFooter>
+                                                </AlertDialogContent>
+                                            </AlertDialog>
+                                        </div>
                                     </div>
                                 </div>
                             ))}
@@ -382,6 +465,26 @@ export default function ProjectDetailPage() {
                     </Card>
                 ))}
             </div>
+
+            <Dialog open={isTimeLogDialogOpen} onOpenChange={setIsTimeLogDialogOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Registrar Horas na Tarefa</DialogTitle>
+                        <DialogDescription>Adicione as horas trabalhadas nesta tarefa. O valor será somado às horas existentes.</DialogDescription>
+                    </DialogHeader>
+                    <form onSubmit={handleLogTime} className="space-y-4">
+                        <div>
+                            <Label htmlFor="hours">Horas a adicionar</Label>
+                            <Input id="hours" name="hours" type="number" step="0.5" placeholder="Ex: 1.5" required />
+                        </div>
+                        <DialogFooter>
+                             <DialogClose asChild><Button type="button" variant="outline">Cancelar</Button></DialogClose>
+                            <Button type="submit">Registrar Horas</Button>
+                        </DialogFooter>
+                    </form>
+                </DialogContent>
+            </Dialog>
+
         </div>
     );
 }

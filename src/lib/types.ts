@@ -65,6 +65,7 @@ export interface Task {
   responsible: string;
   completed: boolean;
   deadline?: any; // Firestore Timestamp
+  loggedHours?: number; // Time Tracking
 }
 
 export interface ProjectSection {
@@ -78,6 +79,7 @@ export interface Project {
   name: string;
   scope: string;
   value: number;
+  cost?: number; // Project Cost for profitability
   status: 'Planejamento' | 'Em Andamento' | 'Pausado' | 'Concluído';
   sections?: ProjectSection[];
   createdAt?: any;
