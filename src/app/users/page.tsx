@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { PlusCircle, Loader2, Edit, Trash2, MoreVertical } from 'lucide-react';
+import { PlusCircle, Loader2, Edit, Trash2, MoreVertical, DollarSign } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { db } from '@/lib/firebase';
 import { collection, addDoc, onSnapshot, doc, updateDoc, deleteDoc } from 'firebase/firestore';
@@ -71,6 +71,7 @@ export default function UsersPage() {
             email: formData.get('email') as string,
             role: formData.get('role') as User['role'],
             avatar: `https://placehold.co/64x64/EBF4FF/2E9AFE.png?text=${(formData.get('name') as string)[0] || 'U'}`,
+            costPerHour: Number(formData.get('costPerHour') || 0),
         };
 
         if (!userData.name || !userData.email || !userData.role) {
@@ -128,6 +129,7 @@ export default function UsersPage() {
                         <TableRow>
                             <TableHead>Usuário</TableHead>
                             <TableHead>Função</TableHead>
+                            <TableHead>Custo/Hora</TableHead>
                             <TableHead className="text-right">Ações</TableHead>
                         </TableRow>
                     </TableHeader>
@@ -147,6 +149,7 @@ export default function UsersPage() {
                                     </div>
                                 </TableCell>
                                 <TableCell>{user.role}</TableCell>
+                                <TableCell>R$ {(user.costPerHour || 0).toFixed(2)}</TableCell>
                                 <TableCell className="text-right">
                                     <DropdownMenu>
                                       <DropdownMenuTrigger asChild>
@@ -200,18 +203,24 @@ export default function UsersPage() {
                             <Label htmlFor="email">Email</Label>
                             <Input id="email" name="email" type="email" defaultValue={currentUser?.email} required />
                         </div>
-                        <div>
-                            <Label htmlFor="role">Função</Label>
-                            <Select name="role" defaultValue={currentUser?.role}>
-                                <SelectTrigger id="role">
-                                    <SelectValue placeholder="Selecione a função" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="Admin">Admin</SelectItem>
-                                    <SelectItem value="Gestor">Gestor</SelectItem>
-                                    <SelectItem value="Analista">Analista</SelectItem>
-                                </SelectContent>
-                            </Select>
+                        <div className="grid grid-cols-2 gap-4">
+                            <div>
+                                <Label htmlFor="role">Função</Label>
+                                <Select name="role" defaultValue={currentUser?.role}>
+                                    <SelectTrigger id="role">
+                                        <SelectValue placeholder="Selecione a função" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="Admin">Admin</SelectItem>
+                                        <SelectItem value="Gestor">Gestor</SelectItem>
+                                        <SelectItem value="Analista">Analista</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                             <div>
+                                <Label htmlFor="costPerHour">Custo/Hora (R$)</Label>
+                                <Input id="costPerHour" name="costPerHour" type="number" step="0.01" placeholder="Ex: 50.00" defaultValue={currentUser?.costPerHour} />
+                            </div>
                         </div>
                         <DialogFooter>
                             <Button type="button" variant="outline" onClick={handleCloseDialog}>Cancelar</Button>
@@ -227,3 +236,5 @@ export default function UsersPage() {
         </div>
     );
 }
+
+    

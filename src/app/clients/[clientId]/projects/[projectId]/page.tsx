@@ -15,7 +15,7 @@ import { PlusCircle, Loader2, Trash2, GripVertical, Check, X, Pencil, CheckCircl
 import { useToast } from '@/hooks/use-toast';
 import { db } from '@/lib/firebase';
 import { collection, onSnapshot, doc, updateDoc, arrayUnion, arrayRemove, getDoc, Timestamp } from 'firebase/firestore';
-import type { Project, ProjectSection, Task, User as AppUser } from '@/lib/types';
+import type { Project, ProjectSection, Task, User as AppUser, LoggedTime } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import {
@@ -51,7 +51,7 @@ export default function ProjectDetailPage() {
     
     // Time tracking state
     const [isTimeLogDialogOpen, setIsTimeLogDialogOpen] = useState(false);
-    const [timeLogData, setTimeLogData] = useState<{ taskId: string; currentHours: number }>({ taskId: '', currentHours: 0 });
+    const [timeLogData, setTimeLogData] = useState<{ taskId: string; currentLogs: LoggedTime[] }>({ taskId: '', currentLogs: [] });
 
 
     const projectDocRef = useMemo(() => doc(db, 'clients', clientId as string, 'projects', projectId as string), [clientId, projectId]);
@@ -87,15 +87,25 @@ export default function ProjectDetailPage() {
     }, [projectDocRef, router, toast, clientId, usersCollectionRef]);
     
     const projectAnalysis = useMemo(() => {
-        if (!project) return { totalLoggedHours: 0, profitMargin: 0 };
-        const totalLoggedHours = project.sections?.reduce((acc, section) => {
-            return acc + (section.tasks || []).reduce((taskAcc, task) => taskAcc + (task.loggedHours || 0), 0);
-        }, 0) || 0;
+        if (!project || !users.length) return { totalLoggedHours: 0, profitMargin: 0, realCost: 0 };
         
-        const profitMargin = project.value - (project.cost || 0);
+        const taskTime = project.sections?.reduce((acc, section) => {
+             (section.tasks || []).forEach(task => {
+                (task.timeLogs || []).forEach(log => {
+                    acc.totalLoggedHours += log.hours;
+                    const user = users.find(u => u.id === log.userId);
+                    if (user && user.costPerHour) {
+                        acc.realCost += log.hours * user.costPerHour;
+                    }
+                });
+            });
+            return acc;
+        }, { totalLoggedHours: 0, realCost: 0 });
 
-        return { totalLoggedHours, profitMargin };
-    }, [project]);
+        const profitMargin = project.value - (taskTime?.realCost || 0);
+
+        return { totalLoggedHours: taskTime?.totalLoggedHours || 0, realCost: taskTime?.realCost || 0, profitMargin };
+    }, [project, users]);
 
 
     const calculateProgress = () => {
@@ -132,7 +142,7 @@ export default function ProjectDetailPage() {
             text: taskInput.text.trim(),
             responsible: taskInput.responsible.trim(),
             completed: false,
-            loggedHours: 0,
+            timeLogs: [],
             ...(taskInput.deadline && { deadline: Timestamp.fromDate(taskInput.deadline) })
         };
         
@@ -174,8 +184,8 @@ export default function ProjectDetailPage() {
         await updateDoc(projectDocRef, { sections: updatedSections });
     };
     
-    const handleOpenTimeLogDialog = (taskId: string, currentHours: number) => {
-        setTimeLogData({ taskId, currentHours });
+    const handleOpenTimeLogDialog = (taskId: string, currentLogs: LoggedTime[] | undefined) => {
+        setTimeLogData({ taskId, currentLogs: currentLogs || [] });
         setIsTimeLogDialogOpen(true);
     };
 
@@ -183,15 +193,28 @@ export default function ProjectDetailPage() {
         event.preventDefault();
         const formData = new FormData(event.currentTarget);
         const hoursToAdd = Number(formData.get('hours'));
+        const userId = formData.get('userId') as string;
 
         if (isNaN(hoursToAdd) || hoursToAdd <= 0) {
             toast({ title: "Valor inválido", description: "Por favor, insira um número de horas válido.", variant: "destructive" });
             return;
         }
+        if (!userId) {
+            toast({ title: "Responsável necessário", description: "Selecione quem está registrando as horas.", variant: "destructive" });
+            return;
+        }
+
+        const newLog: LoggedTime = { userId, hours: hoursToAdd, date: Timestamp.now() };
 
         const updatedSections = project?.sections?.map(s => ({
             ...s,
-            tasks: s.tasks.map(t => t.id === timeLogData.taskId ? { ...t, loggedHours: (t.loggedHours || 0) + hoursToAdd } : t)
+            tasks: s.tasks.map(t => {
+                if (t.id === timeLogData.taskId) {
+                    const newTimeLogs = [...(t.timeLogs || []), newLog];
+                    return { ...t, timeLogs: newTimeLogs };
+                }
+                return t;
+            })
         }));
 
         await updateDoc(projectDocRef, { sections: updatedSections });
@@ -225,6 +248,7 @@ export default function ProjectDetailPage() {
     
     const progress = calculateProgress();
     const isCompleted = progress === 100;
+    const totalHoursForTask = (task: Task) => (task.timeLogs || []).reduce((acc, log) => acc + log.hours, 0);
 
     return (
         <div className="space-y-6">
@@ -322,8 +346,8 @@ export default function ProjectDetailPage() {
                                 <span className="font-bold text-green-400">R$ {project.value.toFixed(2)}</span>
                             </div>
                             <div className="flex justify-between items-center p-3 bg-secondary/50 rounded-md">
-                                <span className="font-medium text-sm">Custo Estimado</span>
-                                <span className="font-bold text-red-400">R$ {(project.cost || 0).toFixed(2)}</span>
+                                <span className="font-medium text-sm">Custo Real</span>
+                                <span className="font-bold text-red-400">R$ {projectAnalysis.realCost.toFixed(2)}</span>
                             </div>
                              <div className="flex justify-between items-center p-3 bg-secondary/50 rounded-md">
                                 <span className="font-medium text-sm">Horas Registradas</span>
@@ -399,9 +423,9 @@ export default function ProjectDetailPage() {
                                                 <CalendarIcon size={12}/>{format(task.deadline.toDate(), 'dd/MM/yy')}
                                             </Badge>
                                         )}
-                                        {(task.loggedHours || 0) > 0 && <Badge variant="secondary" className="flex items-center gap-1"><Clock size={12}/>{task.loggedHours}h</Badge>}
+                                        {totalHoursForTask(task) > 0 && <Badge variant="secondary" className="flex items-center gap-1"><Clock size={12}/>{totalHoursForTask(task)}h</Badge>}
                                         <div className="opacity-0 group-hover:opacity-100 transition-opacity">
-                                            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleOpenTimeLogDialog(task.id, task.loggedHours || 0)}><Clock className="h-3 w-3"/></Button>
+                                            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleOpenTimeLogDialog(task.id, task.timeLogs)}><Clock className="h-3 w-3"/></Button>
                                             <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => {setEditingItemId(task.id); setEditingText(task.text)}}><Pencil className="h-3 w-3"/></Button>
                                             <AlertDialog>
                                                 <AlertDialogTrigger asChild>
@@ -477,6 +501,17 @@ export default function ProjectDetailPage() {
                             <Label htmlFor="hours">Horas a adicionar</Label>
                             <Input id="hours" name="hours" type="number" step="0.5" placeholder="Ex: 1.5" required />
                         </div>
+                        <div>
+                            <Label htmlFor="userId">Membro da Equipe</Label>
+                            <Select name="userId" required>
+                                <SelectTrigger><SelectValue placeholder="Selecione o membro da equipe..." /></SelectTrigger>
+                                <SelectContent>
+                                    {users.map(user => (
+                                        <SelectItem key={user.id} value={user.id}>{user.name}</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
                         <DialogFooter>
                              <DialogClose asChild><Button type="button" variant="outline">Cancelar</Button></DialogClose>
                             <Button type="submit">Registrar Horas</Button>
@@ -488,3 +523,5 @@ export default function ProjectDetailPage() {
         </div>
     );
 }
+
+    

@@ -59,13 +59,19 @@ export interface SocialSession {
   createdAt: any; // Firestore Timestamp
 }
 
+export interface LoggedTime {
+  userId: string;
+  hours: number;
+  date: Timestamp;
+}
+
 export interface Task {
   id: string;
   text: string;
   responsible: string;
   completed: boolean;
   deadline?: any; // Firestore Timestamp
-  loggedHours?: number; // Time Tracking
+  timeLogs?: LoggedTime[]; // Detailed time tracking
 }
 
 export interface ProjectSection {
@@ -79,7 +85,7 @@ export interface Project {
   name: string;
   scope: string;
   value: number;
-  cost?: number; // Project Cost for profitability
+  cost?: number; // Custo Estimado
   status: 'Planejamento' | 'Em Andamento' | 'Pausado' | 'Concluído';
   sections?: ProjectSection[];
   createdAt?: any;
@@ -101,6 +107,7 @@ export interface User {
   email: string;
   role: 'Admin' | 'Gestor' | 'Analista';
   avatar: string;
+  costPerHour?: number;
 }
 
 export interface FinancialTransaction {
@@ -126,3 +133,5 @@ export interface Appointment {
 
 // Re-exporting AI types to be used in the UI
 export type { AdsIACreatorInput };
+
+    
