@@ -36,7 +36,7 @@ Esta é a visão estratégica para transformar o KDS-Vision no sistema operacion
 ### Módulo 2: Operações e Execução (Os Músculos da Agência)
 
 - [ ] **2.1. Gestão de Funis de Vendas e Marketing:** Ferramenta visual (Kanban) para construir e gerenciar funis completos, conectando etapas com campanhas e tarefas.
-- [ ] **2.2. Calendário de Conteúdo Centralizado:** Calendário editorial que integra ideias de IA com planejamento, agendamento e status de aprovação.
+- [x] **2.2. Calendário de Conteúdo Centralizado:** Calendário editorial que integra ideias de IA com planejamento, agendamento e status de aprovação.
 - [ ] **2.3. Banco de Ativos Digitais (DAM):** Local para armazenar, versionar e aprovar criativos, logos, vídeos e documentos.
 - [ ] **2.4. Gestão de Campanhas de Mídia Paga:** Evoluir o "Ads IA Creator" para acompanhar status e orçamento das campanhas.
 
