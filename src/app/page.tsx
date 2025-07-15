@@ -301,7 +301,7 @@ export default function DashboardPage() {
         <p className="text-muted-foreground">Visão geral do seu negócio na Agência Digital.</p>
       </div>
       
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-5">
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
         <Dialog>
           <DialogTrigger asChild>
             <Card className="cursor-pointer hover:border-primary transition-colors">
