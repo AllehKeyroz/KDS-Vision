@@ -81,6 +81,7 @@ export interface Project {
   status: 'Planejamento' | 'Em Andamento' | 'Pausado' | 'Concluído';
   sections?: ProjectSection[];
   createdAt?: any;
+  clientId: string; // Add this line
 }
 
 
@@ -98,6 +99,26 @@ export interface User {
   email: string;
   role: 'Admin' | 'Gestor' | 'Analista';
   avatar: string;
+}
+
+export interface FinancialTransaction {
+  id: string;
+  description: string;
+  amount: number;
+  type: 'income' | 'expense';
+  date: any; // Firestore Timestamp
+  category?: string;
+  recurring: boolean;
+}
+
+export interface Appointment {
+  id: string;
+  title: string;
+  date: Date; // Stored as Timestamp in Firestore, converted to Date on client
+  duration: number; // in minutes
+  userIds: string[];
+  clientId?: string;
+  notes?: string;
 }
 
 

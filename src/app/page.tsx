@@ -3,42 +3,83 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Briefcase, Users, ArrowRight, FolderKanban, ListTodo, Filter, CalendarIcon, User as UserIcon } from 'lucide-react';
+import { Briefcase, Users, ArrowRight, FolderKanban, ListTodo, Filter, CalendarIcon as CalendarIconLucide, User as UserIcon, PlusCircle, CheckCircle2, Loader2, Check, ChevronsUpDown, Trash2 } from 'lucide-react';
 import { db } from '@/lib/firebase';
-import { collection, onSnapshot, query, where, Timestamp } from 'firebase/firestore';
-import type { Client, Prospect, Project, Task, User } from '@/lib/types';
+import { collection, onSnapshot, query, where, Timestamp, addDoc, doc, updateDoc, deleteDoc } from 'firebase/firestore';
+import type { Client, Prospect, Project, Task, User, Appointment } from '@/lib/types';
 import { Progress } from '@/components/ui/progress';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
-import { format } from 'date-fns';
+import { format, addMinutes, setHours, setMinutes, startOfDay } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger, DialogClose, DialogFooter } from '@/components/ui/dialog';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { useToast } from '@/hooks/use-toast';
+import { ptBR } from 'date-fns/locale';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
+import { Badge } from '@/components/ui/badge';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+
+type AppointmentFormData = Omit<Appointment, 'id' | 'date'> & {
+  id?: string;
+  date: Date | undefined;
+}
 
 export default function DashboardPage() {
+  const { toast } = useToast();
   const [clients, setClients] = useState<Client[]>([]);
   const [prospects, setProspects] = useState<Prospect[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [allTasks, setAllTasks] = useState<(Task & { projectName: string; clientId: string; projectId: string })[]>([]);
   const [users, setUsers] = useState<User[]>([]);
+  const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  
   const [filters, setFilters] = useState({ responsible: '', deadline: null as Date | null });
+  const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
+  const [isAppointmentDialogOpen, setIsAppointmentDialogOpen] = useState(false);
+  
+  const emptyAppointment: AppointmentFormData = { title: '', notes: '', userIds: [], duration: 30, date: undefined, clientId: undefined };
+  const [appointmentFormData, setAppointmentFormData] = useState<AppointmentFormData>(emptyAppointment);
 
   useEffect(() => {
-    const unsubscribeClients = onSnapshot(collection(db, 'clients'), (snapshot) => {
-      setClients(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Client)));
-    });
+    const unsubscribes: (() => void)[] = [];
+    setIsLoading(true);
 
-    const unsubscribeProspects = onSnapshot(collection(db, 'prospects'), (snapshot) => {
-      setProspects(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Prospect)));
-    });
+    const subscribe = (col: string, setter: (data: any[]) => void) => {
+        const ref = collection(db, col);
+        const q = col === 'appointments' ? query(ref) : ref; // No specific query for others yet
+        const unsubscribe = onSnapshot(q, (snapshot) => {
+            setter(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+        });
+        unsubscribes.push(unsubscribe);
+    };
 
-    const unsubscribeUsers = onSnapshot(collection(db, 'users'), (snapshot) => {
-      setUsers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as User)));
+    subscribe('clients', setClients);
+    subscribe('prospects', setProspects);
+    subscribe('users', setUsers);
+    
+    const appointmentsQuery = query(collection(db, 'appointments'));
+    const unsubscribeAppointments = onSnapshot(appointmentsQuery, (snapshot) => {
+        setAppointments(snapshot.docs.map(doc => {
+            const data = doc.data();
+            return {
+                id: doc.id,
+                ...data,
+                date: (data.date as Timestamp).toDate(),
+            } as Appointment;
+        }));
     });
+    unsubscribes.push(unsubscribeAppointments);
+
 
     // Fetch all projects from all clients
     const unsubscribeProjects = onSnapshot(query(collection(db, 'clients')), (clientsSnapshot) => {
@@ -74,14 +115,122 @@ export default function DashboardPage() {
             setIsLoading(false);
         });
     });
+    unsubscribes.push(unsubscribeProjects);
 
-    return () => {
-        unsubscribeClients();
-        unsubscribeProspects();
-        unsubscribeUsers();
-        unsubscribeProjects();
-    };
+    return () => unsubscribes.forEach(unsub => unsub());
   }, []);
+
+  const handleOpenAppointmentDialog = (appointment?: Appointment | null, timeSlot?: Date) => {
+    if (appointment) {
+        setAppointmentFormData({ ...appointment, date: appointment.date, userIds: appointment.userIds || [] });
+    } else {
+        const date = timeSlot || selectedDate;
+        setAppointmentFormData({ ...emptyAppointment, date, userIds: [] });
+    }
+    setIsAppointmentDialogOpen(true);
+  };
+  
+  const dailyAppointments = useMemo(() => {
+    if (!selectedDate) return [];
+    const dateStr = format(selectedDate, 'yyyy-MM-dd');
+    return appointments.filter(app => format(app.date, 'yyyy-MM-dd') === dateStr).sort((a,b) => a.date.getTime() - b.date.getTime());
+  }, [appointments, selectedDate]);
+  
+  const timeSlots = useMemo(() => {
+    if (!selectedDate) return [];
+    const start = setMinutes(setHours(selectedDate, 8), 0);
+    const end = setMinutes(setHours(selectedDate, 18), 0);
+    const slots = [];
+    let currentTime = start;
+
+    while (currentTime < end) {
+      const isBooked = dailyAppointments.some(app => {
+        const appStart = app.date.getTime();
+        const appEnd = addMinutes(app.date, app.duration || 30).getTime();
+        return currentTime.getTime() >= appStart && currentTime.getTime() < appEnd;
+      });
+      slots.push({ time: currentTime, booked: isBooked });
+      currentTime = addMinutes(currentTime, 30);
+    }
+    return slots;
+  }, [selectedDate, dailyAppointments]);
+  
+  const handleSaveAppointment = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!appointmentFormData.title || (appointmentFormData.userIds || []).length === 0 || !appointmentFormData.date) {
+        toast({ title: 'Campos obrigatórios', description: 'Título, horário e ao menos um responsável são necessários.', variant: 'destructive' });
+        return;
+    }
+
+    const slotsNeeded = appointmentFormData.duration / 30;
+    const startIndex = timeSlots.findIndex(slot => slot.time.getTime() === appointmentFormData.date?.getTime());
+    
+    if (startIndex === -1 && !appointmentFormData.id) { // Don't check for slot if we are just editing text
+        toast({ title: 'Horário inválido', variant: 'destructive' });
+        return;
+    }
+
+    // Skip time validation if editing an existing event
+    if (!appointmentFormData.id) {
+      for (let i = 0; i < slotsNeeded; i++) {
+          if (startIndex + i >= timeSlots.length || timeSlots[startIndex + i].booked) {
+              toast({ title: 'Horário indisponível', description: 'O horário selecionado não tem tempo livre suficiente para a duração do compromisso.', variant: 'destructive' });
+              return;
+          }
+      }
+    }
+
+
+    setIsSaving(true);
+
+    const dataToSave = {
+        title: appointmentFormData.title,
+        notes: appointmentFormData.notes,
+        userIds: appointmentFormData.userIds,
+        clientId: appointmentFormData.clientId || null,
+        date: Timestamp.fromDate(appointmentFormData.date),
+        duration: appointmentFormData.duration,
+    };
+
+    try {
+        if (appointmentFormData.id) {
+            // Update existing
+            const docRef = doc(db, 'appointments', appointmentFormData.id);
+            await updateDoc(docRef, dataToSave);
+            toast({ title: 'Compromisso Atualizado!', description: 'O compromisso foi salvo.' });
+        } else {
+            // Create new
+            await addDoc(collection(db, 'appointments'), dataToSave);
+            toast({ title: 'Compromisso Adicionado!', description: 'O novo compromisso foi salvo.' });
+        }
+        setIsAppointmentDialogOpen(false);
+        setAppointmentFormData(emptyAppointment);
+    } catch (error) {
+        toast({ title: 'Erro ao salvar', variant: 'destructive' });
+    } finally {
+        setIsSaving(false);
+    }
+  };
+
+  const handleDeleteAppointment = async (appointmentId?: string) => {
+      if (!appointmentId) return;
+      setIsSaving(true);
+      try {
+          await deleteDoc(doc(db, 'appointments', appointmentId));
+          toast({ title: "Compromisso Removido", description: "O compromisso foi removido com sucesso." });
+          setIsAppointmentDialogOpen(false);
+          setAppointmentFormData(emptyAppointment);
+      } catch (error) {
+          toast({ title: "Erro ao remover", variant: "destructive" });
+      } finally {
+          setIsSaving(false);
+      }
+  }
+  
+  const appointmentDates = useMemo(() => {
+      return appointments.map(app => app.date);
+  }, [appointments]);
+
 
   const calculateProgress = (project: Project): number => {
     const allTasks = project.sections?.flatMap(s => s.tasks || []) || [];
@@ -119,40 +268,105 @@ export default function DashboardPage() {
       </div>
       
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Clientes Ativos</CardTitle>
-            <Users className="w-4 h-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            {isLoading ? <Skeleton className="h-8 w-1/4" /> : <div className="text-2xl font-bold">{clients.length}</div>}
-            <p className="text-xs text-muted-foreground">Clientes com projetos em andamento.</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Prospects em Andamento</CardTitle>
-            <Briefcase className="w-4 h-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-             {isLoading ? <Skeleton className="h-8 w-1/4" /> : <div className="text-2xl font-bold">{prospects.length}</div>}
-            <p className="text-xs text-muted-foreground">Leads no funil de vendas.</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Projetos Totais</CardTitle>
-            <FolderKanban className="w-4 h-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            {isLoading ? <Skeleton className="h-8 w-1/4" /> : <div className="text-2xl font-bold">{projects.length}</div>}
-            <p className="text-xs text-muted-foreground">Gerenciando o sucesso dos clientes.</p>
-          </CardContent>
-        </Card>
+        <Dialog>
+          <DialogTrigger asChild>
+            <Card className="cursor-pointer hover:border-primary transition-colors">
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm font-medium">Clientes Ativos</CardTitle>
+                <Users className="w-4 h-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                {isLoading ? <Skeleton className="h-8 w-1/4" /> : <div className="text-2xl font-bold">{clients.length}</div>}
+                <p className="text-xs text-muted-foreground">Clientes com projetos em andamento.</p>
+              </CardContent>
+            </Card>
+          </DialogTrigger>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Clientes Ativos</DialogTitle>
+              <DialogDescription>Lista de todos os clientes ativos.</DialogDescription>
+            </DialogHeader>
+            <ScrollArea className="max-h-96">
+                {clients.map(client => (
+                    <Link key={client.id} href={`/clients/${client.id}`} passHref>
+                        <div className="flex items-center justify-between p-2 rounded-md hover:bg-secondary">
+                           <p className="font-medium">{client.name}</p>
+                           <ArrowRight className="h-4 w-4 text-muted-foreground" />
+                        </div>
+                    </Link>
+                ))}
+            </ScrollArea>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog>
+          <DialogTrigger asChild>
+            <Card className="cursor-pointer hover:border-primary transition-colors">
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm font-medium">Prospects em Andamento</CardTitle>
+                <Briefcase className="w-4 h-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                {isLoading ? <Skeleton className="h-8 w-1/4" /> : <div className="text-2xl font-bold">{prospects.length}</div>}
+                <p className="text-xs text-muted-foreground">Leads no funil de vendas.</p>
+              </CardContent>
+            </Card>
+           </DialogTrigger>
+           <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Prospects em Andamento</DialogTitle>
+              <DialogDescription>Lista de todos os prospects no funil.</DialogDescription>
+            </DialogHeader>
+            <ScrollArea className="max-h-96">
+                {prospects.map(prospect => (
+                    <Link key={prospect.id} href="/prospects" passHref>
+                        <div className="flex items-center justify-between p-2 rounded-md hover:bg-secondary">
+                           <p className="font-medium">{prospect.name}</p>
+                           <p className="text-sm text-muted-foreground">{prospect.stage}</p>
+                        </div>
+                    </Link>
+                ))}
+            </ScrollArea>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog>
+            <DialogTrigger asChild>
+                <Card className="cursor-pointer hover:border-primary transition-colors">
+                  <CardHeader className="flex flex-row items-center justify-between pb-2">
+                    <CardTitle className="text-sm font-medium">Projetos Totais</CardTitle>
+                    <FolderKanban className="w-4 h-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    {isLoading ? <Skeleton className="h-8 w-1/4" /> : <div className="text-2xl font-bold">{projects.length}</div>}
+                    <p className="text-xs text-muted-foreground">Gerenciando o sucesso dos clientes.</p>
+                  </CardContent>
+                </Card>
+            </DialogTrigger>
+             <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Projetos em Andamento</DialogTitle>
+                  <DialogDescription>Lista de todos os projetos em andamento.</DialogDescription>
+                </DialogHeader>
+                <ScrollArea className="max-h-96">
+                    {projects.filter(p => p.status !== 'Concluído').map(project => (
+                        <Link key={project.id} href={`/clients/${project.clientId}/projects/${project.id}`} passHref>
+                             <div className="flex items-center justify-between p-2 rounded-md hover:bg-secondary">
+                               <div>
+                                   <p className="font-medium">{project.name}</p>
+                                   <p className="text-sm text-muted-foreground">{clients.find(c => c.id === project.clientId)?.name}</p>
+                               </div>
+                               <ArrowRight className="h-4 w-4 text-muted-foreground" />
+                            </div>
+                        </Link>
+                    ))}
+                </ScrollArea>
+              </DialogContent>
+        </Dialog>
       </div>
 
-       <div className="grid gap-8 md:grid-cols-2">
-          <Card className="col-span-1 md:col-span-2">
+       <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
+          <Card className="col-span-1 md:col-span-2 lg:col-span-2">
               <CardHeader>
                   <CardTitle className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
@@ -190,7 +404,7 @@ export default function DashboardPage() {
                                             <Popover>
                                                 <PopoverTrigger asChild>
                                                     <Button variant={"outline"} className={cn("col-span-2 h-8 justify-start text-left font-normal", !filters.deadline && "text-muted-foreground")}>
-                                                        <CalendarIcon className="mr-2 h-4 w-4" />
+                                                        <CalendarIconLucide className="mr-2 h-4 w-4" />
                                                         {filters.deadline ? format(filters.deadline, "PPP") : <span>Escolha uma data</span>}
                                                     </Button>
                                                 </PopoverTrigger>
@@ -206,8 +420,8 @@ export default function DashboardPage() {
                   <CardDescription>Tarefas pendentes de todos os projetos, ordenadas por urgência.</CardDescription>
               </CardHeader>
               <CardContent>
-                  <div className="space-y-4 max-h-96 overflow-y-auto">
-                      {isLoading ? Array.from({length: 5}).map((_, i) => <Skeleton key={i} className="h-10 w-full" />) :
+                  <ScrollArea className="h-96">
+                      {isLoading ? Array.from({length: 5}).map((_, i) => <Skeleton key={i} className="h-10 w-full mb-2" />) :
                        filteredTasks.length > 0 ? filteredTasks.map(task => (
                            <Link key={task.id} href={`/clients/${task.clientId}/projects/${task.projectId}`} className="block">
                                <div className="flex items-center justify-between p-2 rounded-md hover:bg-secondary">
@@ -228,59 +442,217 @@ export default function DashboardPage() {
                        )) : (
                           <p className="text-muted-foreground text-center py-8">Nenhuma tarefa pendente encontrada.</p>
                        )}
-                  </div>
+                  </ScrollArea>
               </CardContent>
           </Card>
-
-          <Card>
-            <CardHeader>
-                <CardTitle>Projetos em Andamento</CardTitle>
-            </CardHeader>
-            <CardContent className="grid gap-4 max-h-96 overflow-y-auto">
-               {isLoading ? Array.from({length: 3}).map((_, i) => <Skeleton key={i} className="h-16 w-full" />) :
-                projects.filter(p => p.status !== 'Concluído').map(project => (
-                  <Link key={project.id} href={`/clients/${project.clientId}/projects/${project.id}`}>
-                    <div className="mb-4 grid grid-cols-[25px_1fr] items-start pb-4 last:mb-0 last:pb-0 hover:bg-secondary p-2 rounded-md">
-                      <span className="flex h-2 w-2 translate-y-1 rounded-full bg-sky-500" />
-                      <div className="space-y-1">
-                        <p className="text-sm font-medium leading-none">
-                          {project.name}
-                        </p>
-                        <p className="text-sm text-muted-foreground">
-                         Cliente: {clients.find(c => c.id === project.clientId)?.name}
-                        </p>
-                         <Progress value={calculateProgress(project)} className="h-2 mt-2"/>
-                      </div>
-                    </div>
-                  </Link>
-                ))}
-            </CardContent>
-          </Card>
            
-          <Card>
+          <Card className="col-span-1 md:col-span-2 lg:col-span-1">
             <CardHeader>
-                <CardTitle>Acesso Rápido</CardTitle>
+                <CardTitle>Calendário de Compromissos</CardTitle>
+                 <CardDescription>Clique em uma data ou em um horário livre para adicionar um evento.</CardDescription>
             </CardHeader>
-            <CardContent className="grid gap-4">
-                 <Link href="/clients" passHref>
-                    <div className="hover:bg-secondary transition-colors p-4 rounded-lg border">
-                        <h3 className="font-semibold flex items-center justify-between">
-                            Gerenciar Clientes <ArrowRight className="w-5 h-5" />
-                        </h3>
-                        <p className="text-sm text-muted-foreground">Acesse os painéis e projetos de seus clientes.</p>
-                    </div>
-                </Link>
-                 <Link href="/prospects" passHref>
-                    <div className="hover:bg-secondary transition-colors p-4 rounded-lg border">
-                        <h3 className="font-semibold flex items-center justify-between">
-                            Funil de Prospecção <ArrowRight className="w-5 h-5" />
-                        </h3>
-                        <p className="text-sm text-muted-foreground">Organize seus leads e follow-ups.</p>
-                    </div>
-                </Link>
+            <CardContent>
+                <Calendar
+                    mode="single"
+                    selected={selectedDate}
+                    onSelect={(date) => setSelectedDate(date)}
+                    className="p-0 rounded-md border"
+                    locale={ptBR}
+                    modifiers={{ scheduled: appointmentDates }}
+                    modifiersClassNames={{
+                        scheduled: 'relative after:absolute after:bottom-1 after:left-1/2 after:-translate-x-1/2 after:w-1 after:h-1 after:rounded-full after:bg-primary',
+                    }}
+                />
+                 <div className="mt-4 space-y-2">
+                    <h4 className="font-semibold">Compromissos para {selectedDate ? format(selectedDate, 'dd/MM/yyyy') : '...'}:</h4>
+                    {dailyAppointments.length > 0 ? (
+                        <ScrollArea className="h-40">
+                        {dailyAppointments.map(app => (
+                            <div key={app.id} onClick={() => handleOpenAppointmentDialog(app)} className="text-sm p-2 rounded-md bg-secondary/50 mb-1 cursor-pointer hover:bg-secondary">
+                                <p className="font-bold">{app.title}</p>
+                                <p className="text-xs text-muted-foreground">Horário: {format(app.date, 'HH:mm')}</p>
+                                {app.userIds && <p className="text-xs text-muted-foreground">Responsáveis: {app.userIds.map(uid => users.find(u => u.id === uid)?.name || '').join(', ')}</p>}
+                                {app.notes && <p className="text-xs mt-1">{app.notes}</p>}
+                            </div>
+                        ))}
+                        </ScrollArea>
+                    ) : (
+                        <p className="text-sm text-muted-foreground">Nenhum compromisso para esta data.</p>
+                    )}
+                 </div>
             </CardContent>
           </Card>
       </div>
+
+       <Dialog open={isAppointmentDialogOpen} onOpenChange={(isOpen) => {
+            setIsAppointmentDialogOpen(isOpen);
+            if (!isOpen) {
+                setAppointmentFormData(emptyAppointment);
+            }
+       }}>
+        <DialogContent className="sm:max-w-[625px]">
+            <DialogHeader>
+                <DialogTitle>{appointmentFormData.id ? 'Editar Compromisso' : 'Adicionar Compromisso'}</DialogTitle>
+                <DialogDescription>
+                   {appointmentFormData.id ? 'Edite os detalhes do compromisso abaixo.' : `Agende um novo compromisso para ${selectedDate ? format(selectedDate, 'PPP', {locale: ptBR}) : ''}.`}
+                </DialogDescription>
+            </DialogHeader>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <form onSubmit={handleSaveAppointment} className="space-y-4">
+                    <div>
+                        <Label htmlFor="title">Título do Compromisso</Label>
+                        <Input id="title" value={appointmentFormData.title} onChange={e => setAppointmentFormData(p => ({...p, title: e.target.value}))} required />
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-4">
+                        <div>
+                             <Label>Horário de Início</Label>
+                             <Input type="text" readOnly value={appointmentFormData.date ? format(appointmentFormData.date, 'HH:mm') : "Selecione um horário"} className="bg-muted"/>
+                        </div>
+                        <div>
+                            <Label htmlFor="duration">Duração (min)</Label>
+                            <Select 
+                                value={String(appointmentFormData.duration)} 
+                                onValueChange={value => setAppointmentFormData(p => ({...p, duration: Number(value)}))}>
+                                <SelectTrigger>
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="30">30 min</SelectItem>
+                                    <SelectItem value="60">60 min</SelectItem>
+                                    <SelectItem value="90">90 min</SelectItem>
+                                    <SelectItem value="120">120 min</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+                    </div>
+
+                    <div>
+                        <Label>Atribuir a</Label>
+                        <Popover>
+                            <PopoverTrigger asChild>
+                            <Button
+                                variant="outline"
+                                role="combobox"
+                                className="w-full justify-between"
+                            >
+                                {(appointmentFormData.userIds || []).length > 0
+                                ? `${(appointmentFormData.userIds || []).length} selecionado(s)`
+                                : "Selecione os membros..."}
+                                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                            </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-full p-0">
+                            <Command>
+                                <CommandInput placeholder="Procurar membro..." />
+                                <CommandEmpty>Nenhum membro encontrado.</CommandEmpty>
+                                <CommandGroup>
+                                <CommandList>
+                                    {users.map((user) => (
+                                    <CommandItem
+                                        key={user.id}
+                                        onSelect={() => {
+                                        setAppointmentFormData(p => {
+                                            const currentIds = p.userIds || [];
+                                            const newIds = currentIds.includes(user.id)
+                                            ? currentIds.filter(id => id !== user.id)
+                                            : [...currentIds, user.id];
+                                            return {...p, userIds: newIds};
+                                        })
+                                        }}
+                                    >
+                                        <Check
+                                        className={cn(
+                                            "mr-2 h-4 w-4",
+                                            (appointmentFormData.userIds || []).includes(user.id) ? "opacity-100" : "opacity-0"
+                                        )}
+                                        />
+                                        {user.name}
+                                    </CommandItem>
+                                    ))}
+                                </CommandList>
+                                </CommandGroup>
+                            </Command>
+                            </PopoverContent>
+                        </Popover>
+                        <div className="pt-2 flex flex-wrap gap-1">
+                            {(appointmentFormData.userIds || []).map(id => {
+                                const user = users.find(u => u.id === id);
+                                return user ? <Badge key={id} variant="secondary">{user.name}</Badge> : null;
+                            })}
+                        </div>
+                    </div>
+                     <div>
+                        <Label htmlFor="clientId">Cliente (Opcional)</Label>
+                        <Select value={appointmentFormData.clientId} onValueChange={value => setAppointmentFormData(p => ({...p, clientId: value === 'none' ? undefined : value}))}>
+                            <SelectTrigger id="clientId">
+                                <SelectValue placeholder="Selecione um cliente" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="none">Nenhum</SelectItem>
+                                {clients.map(client => (
+                                    <SelectItem key={client.id} value={client.id}>{client.name}</SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </div>
+                     <div>
+                        <Label htmlFor="notes">Notas (Opcional)</Label>
+                        <Textarea id="notes" value={appointmentFormData.notes || ''} onChange={e => setAppointmentFormData(p => ({...p, notes: e.target.value}))} />
+                    </div>
+                    <DialogFooter className="justify-between pt-4">
+                         {appointmentFormData.id ? (
+                            <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                    <Button type="button" variant="destructive"><Trash2 className="mr-2 h-4 w-4"/> Excluir</Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                    <AlertDialogHeader>
+                                        <AlertDialogTitle>Excluir compromisso?</AlertDialogTitle>
+                                        <AlertDialogDescription>
+                                            Esta ação não pode ser desfeita.
+                                        </AlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                        <AlertDialogAction onClick={() => handleDeleteAppointment(appointmentFormData.id)} className="bg-destructive hover:bg-destructive/90">Excluir</AlertDialogAction>
+                                    </AlertDialogFooter>
+                                </AlertDialogContent>
+                            </AlertDialog>
+                         ) : <div></div>}
+                        <div className="flex gap-2">
+                            <DialogClose asChild><Button type="button" variant="outline">Cancelar</Button></DialogClose>
+                            <Button type="submit" disabled={isSaving}>
+                                {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                                Salvar
+                            </Button>
+                        </div>
+                    </DialogFooter>
+                </form>
+                <div className="space-y-2">
+                    <h3 className="text-sm font-medium">Disponibilidade do Dia</h3>
+                    <ScrollArea className="h-80 border rounded-md p-2">
+                        <div className="space-y-1">
+                            {timeSlots.map(slot => (
+                                <button key={slot.time.toISOString()} 
+                                    onClick={() => !slot.booked && setAppointmentFormData(p => ({...p, date: slot.time}))}
+                                    disabled={slot.booked}
+                                    className={cn(
+                                        "w-full p-2 rounded-md text-xs flex justify-between items-center",
+                                        "transition-colors",
+                                        slot.booked ? "bg-red-900/50 text-muted-foreground cursor-not-allowed" : "bg-secondary hover:bg-accent",
+                                        appointmentFormData.date?.getTime() === slot.time.getTime() && !slot.booked && "ring-2 ring-primary bg-primary/20"
+                                )}>
+                                    <span>{format(slot.time, 'HH:mm')} - {format(addMinutes(slot.time, 30), 'HH:mm')}</span>
+                                    <Badge variant={slot.booked ? "destructive" : "default"}>{slot.booked ? "Ocupado" : "Livre"}</Badge>
+                                </button>
+                            ))}
+                        </div>
+                    </ScrollArea>
+                </div>
+            </div>
+        </DialogContent>
+       </Dialog>
     </div>
   );
 }
