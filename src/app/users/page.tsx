@@ -31,7 +31,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
   AlertDialogTrigger,
-} from "@/components/ui/alert-dialog"
+} from "@/components/ui/alert-dialog";
+import { formatCurrency } from '@/lib/utils';
 
 export default function UsersPage() {
     const { toast } = useToast();
@@ -149,7 +150,7 @@ export default function UsersPage() {
                                     </div>
                                 </TableCell>
                                 <TableCell>{user.role}</TableCell>
-                                <TableCell>R$ {(user.costPerHour || 0).toFixed(2)}</TableCell>
+                                <TableCell>{formatCurrency(user.costPerHour || 0)}</TableCell>
                                 <TableCell className="text-right">
                                     <DropdownMenu>
                                       <DropdownMenuTrigger asChild>

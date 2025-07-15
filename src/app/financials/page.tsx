@@ -16,7 +16,7 @@ import { collection, addDoc, onSnapshot, doc, updateDoc, deleteDoc, serverTimest
 import type { FinancialTransaction, Contract, Client } from '@/lib/types';
 import { format, startOfMonth, subMonths, getMonth, getYear, isBefore } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { cn } from '@/lib/utils';
+import { cn, formatCurrency } from '@/lib/utils';
 import { Checkbox } from '@/components/ui/checkbox';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
@@ -275,11 +275,11 @@ export default function FinancialsPage() {
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
                 <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">Balanço Total</CardTitle><DollarSign className="h-4 w-4 text-muted-foreground" /></CardHeader>
-                    <CardContent><div className={cn("text-2xl font-bold", totalBalance >= 0 ? "text-green-500" : "text-red-500")}>R$ {totalBalance.toFixed(2)}</div></CardContent>
+                    <CardContent><div className={cn("text-2xl font-bold", totalBalance >= 0 ? "text-green-500" : "text-red-500")}>{formatCurrency(totalBalance)}</div></CardContent>
                 </Card>
                  <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">Receita Recorrente Mensal (MRR)</CardTitle><RefreshCcw className="h-4 w-4 text-muted-foreground" /></CardHeader>
-                    <CardContent><div className="text-2xl font-bold text-primary">R$ {mrr.toFixed(2)}</div></CardContent>
+                    <CardContent><div className="text-2xl font-bold text-primary">{formatCurrency(mrr)}</div></CardContent>
                 </Card>
             </div>
 
@@ -289,7 +289,7 @@ export default function FinancialsPage() {
                 </CardHeader>
                 <CardContent className="h-80">
                     {isLoading ? <Skeleton className="h-full w-full" /> : (
-                    <ResponsiveContainer width="100%" height="100%"><BarChart data={chartData}><CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border) / 0.5)" /><XAxis dataKey="name" stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} /><YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(value) => `R$${value}`} /><Tooltip cursor={{ fill: 'hsl(var(--accent))' }} contentStyle={{ backgroundColor: 'hsl(var(--background))', borderColor: 'hsl(var(--border))' }}/><Legend /><Bar dataKey="Receita" fill="hsl(var(--chart-2))" radius={[4, 4, 0, 0]} /><Bar dataKey="Despesa" fill="hsl(var(--destructive))" radius={[4, 4, 0, 0]} /></BarChart></ResponsiveContainer>
+                    <ResponsiveContainer width="100%" height="100%"><BarChart data={chartData}><CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border) / 0.5)" /><XAxis dataKey="name" stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} /><YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(value) => formatCurrency(value as number, 'compact')} /><Tooltip cursor={{ fill: 'hsl(var(--accent))' }} contentStyle={{ backgroundColor: 'hsl(var(--background))', borderColor: 'hsl(var(--border))' }} formatter={(value: number) => formatCurrency(value)}/><Legend /><Bar dataKey="Receita" fill="hsl(var(--chart-2))" radius={[4, 4, 0, 0]} /><Bar dataKey="Despesa" fill="hsl(var(--destructive))" radius={[4, 4, 0, 0]} /></BarChart></ResponsiveContainer>
                     )}
                 </CardContent>
             </Card>
@@ -307,7 +307,7 @@ export default function FinancialsPage() {
                         <Table><TableHeader><TableRow><TableHead>Cliente</TableHead><TableHead>Título</TableHead><TableHead>Valor Mensal</TableHead><TableHead>Status</TableHead><TableHead className="text-right">Ações</TableHead></TableRow></TableHeader>
                             <TableBody>
                                 {contracts.length > 0 ? contracts.map((c) => (
-                                    <TableRow key={c.id}><TableCell className="font-medium">{c.clientName}</TableCell><TableCell>{c.title}</TableCell><TableCell className="font-bold text-primary">R$ {c.amount.toFixed(2)}</TableCell><TableCell><span className={cn("px-2 py-1 text-xs font-semibold rounded-full", c.status === 'active' ? 'bg-green-500/10 text-green-400' : 'bg-gray-500/10 text-gray-400')}>{c.status}</span></TableCell>
+                                    <TableRow key={c.id}><TableCell className="font-medium">{c.clientName}</TableCell><TableCell>{c.title}</TableCell><TableCell className="font-bold text-primary">{formatCurrency(c.amount)}</TableCell><TableCell><span className={cn("px-2 py-1 text-xs font-semibold rounded-full", c.status === 'active' ? 'bg-green-500/10 text-green-400' : 'bg-gray-500/10 text-gray-400')}>{c.status}</span></TableCell>
                                         <TableCell className="text-right">
                                              <DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon"><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger>
                                                 <DropdownMenuContent><DropdownMenuItem onClick={() => handleOpenContractDialog(c)}><Edit className="mr-2 h-4 w-4"/>Editar</DropdownMenuItem>
@@ -329,7 +329,7 @@ export default function FinancialsPage() {
                         <Table><TableHeader><TableRow><TableHead>Descrição</TableHead><TableHead>Valor</TableHead><TableHead>Tipo</TableHead><TableHead>Data</TableHead><TableHead className="text-right">Ações</TableHead></TableRow></TableHeader>
                             <TableBody>
                                 {transactions.length > 0 ? transactions.map((t) => (
-                                    <TableRow key={t.id}><TableCell className="font-medium">{t.description}</TableCell><TableCell className={cn(t.type === 'income' ? 'text-green-500' : 'text-red-500')}>R$ {t.amount.toFixed(2)}</TableCell>
+                                    <TableRow key={t.id}><TableCell className="font-medium">{t.description}</TableCell><TableCell className={cn(t.type === 'income' ? 'text-green-500' : 'text-red-500')}>{formatCurrency(t.amount)}</TableCell>
                                         <TableCell><span className={cn("flex items-center gap-2 text-xs font-semibold rounded-full px-2 py-1 w-fit", t.type === 'income' ? 'bg-green-500/10 text-green-400' : 'bg-red-500/10 text-red-400')}>{t.type === 'income' ? <ArrowUpCircle className="h-4 w-4" /> : <ArrowDownCircle className="h-4 w-4" />}{t.type === 'income' ? 'Entrada' : 'Saída'}</span></TableCell>
                                         <TableCell>{t.date ? format(t.date, 'dd/MM/yyyy') : ''}</TableCell>
                                         <TableCell className="text-right">

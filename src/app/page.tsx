@@ -8,14 +8,14 @@ import { Button } from '@/components/ui/button';
 import { Briefcase, Users, ArrowRight, FolderKanban, ListTodo, Filter, CalendarIcon as CalendarIconLucide, User as UserIcon, PlusCircle, CheckCircle2, Loader2, Check, ChevronsUpDown, Trash2, DollarSign, RefreshCcw } from 'lucide-react';
 import { db } from '@/lib/firebase';
 import { collection, onSnapshot, query, where, Timestamp, addDoc, doc, updateDoc, deleteDoc } from 'firebase/firestore';
-import type { Client, Prospect, Project, Task, User, Appointment, FinancialTransaction } from '@/lib/types';
+import type { Client, Prospect, Project, Task, User, Appointment, FinancialTransaction, Contract } from '@/lib/types';
 import { Progress } from '@/components/ui/progress';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { format, addMinutes, setHours, setMinutes, startOfDay, startOfMonth, subMonths, endOfMonth } from 'date-fns';
-import { cn } from '@/lib/utils';
+import { cn, formatCurrency } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger, DialogClose, DialogFooter } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -42,6 +42,7 @@ export default function DashboardPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [financials, setFinancials] = useState<FinancialTransaction[]>([]);
+  const [contracts, setContracts] = useState<Contract[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   
@@ -56,9 +57,9 @@ export default function DashboardPage() {
     const unsubscribes: (() => void)[] = [];
     setIsLoading(true);
 
-    const subscribe = (col: string, setter: (data: any[]) => void) => {
+    const subscribe = (col: string, setter: (data: any[]) => void, queryFunc?: Function) => {
         const ref = collection(db, col);
-        const q = col === 'appointments' ? query(ref) : ref;
+        const q = queryFunc ? queryFunc(ref) : ref;
         const unsubscribe = onSnapshot(q, (snapshot) => {
             setter(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
         });
@@ -94,6 +95,12 @@ export default function DashboardPage() {
         }));
     });
     unsubscribes.push(unsubscribeFinancials);
+
+    const contractsQuery = query(collection(db, 'contracts'));
+    const unsubscribeContracts = onSnapshot(contractsQuery, (snapshot) => {
+        setContracts(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Contract)));
+    });
+    unsubscribes.push(unsubscribeContracts);
 
 
     // Fetch all projects from all clients
@@ -271,9 +278,9 @@ export default function DashboardPage() {
   
   const { totalBalance, mrr } = useMemo(() => {
     const balance = financials.reduce((acc, t) => t.type === 'income' ? acc + t.amount : acc - t.amount, 0);
-    const recurring = financials.reduce((acc, t) => (t.type === 'income' && t.recurring) ? acc + t.amount : acc, 0);
+    const recurring = contracts.reduce((acc, c) => c.status === 'active' ? acc + c.amount : acc, 0);
     return { totalBalance: balance, mrr: recurring };
-  }, [financials]);
+  }, [financials, contracts]);
 
   return (
     <div className="space-y-8">
@@ -348,13 +355,13 @@ export default function DashboardPage() {
         <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2"><CardTitle className="text-sm font-medium">Balanço Total</CardTitle><DollarSign className="h-4 w-4 text-muted-foreground" /></CardHeader>
             <CardContent>
-                 {isLoading ? <Skeleton className="h-8 w-1/2" /> : <div className={cn("text-2xl font-bold", totalBalance >= 0 ? "text-green-500" : "text-red-500")}>R$ {totalBalance.toFixed(2)}</div>}
+                 {isLoading ? <Skeleton className="h-8 w-1/2" /> : <div className={cn("text-2xl font-bold", totalBalance >= 0 ? "text-green-500" : "text-red-500")}>{formatCurrency(totalBalance)}</div>}
             </CardContent>
         </Card>
          <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2"><CardTitle className="text-sm font-medium">MRR</CardTitle><RefreshCcw className="h-4 w-4 text-muted-foreground" /></CardHeader>
             <CardContent>
-                {isLoading ? <Skeleton className="h-8 w-1/2" /> : <div className="text-2xl font-bold">R$ {mrr.toFixed(2)}</div>}
+                {isLoading ? <Skeleton className="h-8 w-1/2" /> : <div className="text-2xl font-bold">{formatCurrency(mrr)}</div>}
             </CardContent>
         </Card>
       </div>

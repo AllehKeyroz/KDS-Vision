@@ -16,7 +16,7 @@ import { useToast } from '@/hooks/use-toast';
 import { db } from '@/lib/firebase';
 import { collection, onSnapshot, doc, updateDoc, arrayUnion, arrayRemove, getDoc, Timestamp } from 'firebase/firestore';
 import type { Project, ProjectSection, Task, User as AppUser, LoggedTime } from '@/lib/types';
-import { cn } from '@/lib/utils';
+import { cn, formatCurrency } from '@/lib/utils';
 import { format } from 'date-fns';
 import {
   AlertDialog,
@@ -270,7 +270,7 @@ export default function ProjectDetailPage() {
                                     <CardDescription>Escopo: {project.scope}</CardDescription>
                                 </div>
                                 <div className="text-right">
-                                   <p className="text-lg font-bold">R$ {project.value.toFixed(2)}</p>
+                                   <p className="text-lg font-bold">{formatCurrency(project.value)}</p>
                                    <Badge variant={isCompleted ? "default" : "secondary"} className={isCompleted ? "bg-green-500/20 text-green-400 border-green-500/30" : ""}>{project.status}</Badge>
                                 </div>
                             </div>
@@ -343,11 +343,11 @@ export default function ProjectDetailPage() {
                         <CardContent className="space-y-4">
                             <div className="flex justify-between items-center p-3 bg-secondary/50 rounded-md">
                                 <span className="font-medium text-sm">Valor do Projeto</span>
-                                <span className="font-bold text-green-400">R$ {project.value.toFixed(2)}</span>
+                                <span className="font-bold text-green-400">{formatCurrency(project.value)}</span>
                             </div>
                             <div className="flex justify-between items-center p-3 bg-secondary/50 rounded-md">
                                 <span className="font-medium text-sm">Custo Real</span>
-                                <span className="font-bold text-red-400">R$ {projectAnalysis.realCost.toFixed(2)}</span>
+                                <span className="font-bold text-red-400">{formatCurrency(projectAnalysis.realCost)}</span>
                             </div>
                              <div className="flex justify-between items-center p-3 bg-secondary/50 rounded-md">
                                 <span className="font-medium text-sm">Horas Registradas</span>
@@ -356,7 +356,7 @@ export default function ProjectDetailPage() {
                             <div className="flex justify-between items-center p-3 bg-primary/10 rounded-md border border-primary/20">
                                 <span className="font-medium text-sm">Margem de Lucro</span>
                                 <span className={cn("font-bold text-lg", projectAnalysis.profitMargin >= 0 ? "text-primary" : "text-destructive")}>
-                                    R$ {projectAnalysis.profitMargin.toFixed(2)}
+                                    {formatCurrency(projectAnalysis.profitMargin)}
                                 </span>
                             </div>
                         </CardContent>

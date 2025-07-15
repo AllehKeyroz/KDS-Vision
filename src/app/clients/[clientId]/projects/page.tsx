@@ -22,6 +22,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { formatCurrency } from '@/lib/utils';
 
 export default function ProjectsPage() {
     const params = useParams();
@@ -157,7 +158,7 @@ export default function ProjectsPage() {
                                       </DropdownMenuContent>
                                     </DropdownMenu>
                                 </div>
-                                <CardDescription>Valor: R$ {project.value.toFixed(2)}</CardDescription>
+                                <CardDescription>Valor: {formatCurrency(project.value)}</CardDescription>
                             </CardHeader>
                             <CardContent className="space-y-4">
                                 <div>
