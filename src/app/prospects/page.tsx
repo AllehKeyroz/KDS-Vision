@@ -5,19 +5,28 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import type { Prospect } from "@/lib/types";
-import { PlusCircle, Loader2, MoreVertical, Edit, Trash2 } from "lucide-react";
+import { PlusCircle, Loader2, MoreVertical, Edit, Trash2, Wand2, Save } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogTrigger, DialogClose } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { db } from '@/lib/firebase';
-import { collection, addDoc, onSnapshot, doc, updateDoc, deleteDoc, serverTimestamp, query, where, getDocs, writeBatch } from 'firebase/firestore';
+import { collection, addDoc, onSnapshot, doc, updateDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { format } from 'date-fns';
+import { runProspectScraper } from '@/app/actions';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 
 const STAGES: Prospect['stage'][] = ['Contato Inicial', 'Qualificado', 'Proposta Enviada', 'Follow-up', 'Negociação', 'Fechado', 'Perdido'];
+
+type ScrapedProspect = {
+    name: string;
+    address: string;
+    rating?: number;
+    contact: string;
+};
 
 export default function ProspectsPage() {
     const [prospects, setProspects] = useState<Prospect[]>([]);
@@ -26,6 +35,12 @@ export default function ProspectsPage() {
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const [currentProspect, setCurrentProspect] = useState<Partial<Prospect> | null>(null);
     const { toast } = useToast();
+
+    const [isScraping, setIsScraping] = useState(false);
+    const [scrapeQuery, setScrapeQuery] = useState({ query: '', location: '', limit: 20 });
+    const [scrapedResults, setScrapedResults] = useState<ScrapedProspect[]>([]);
+    const [isSavingAll, setIsSavingAll] = useState(false);
+    const [isScrapeResultsDialogOpen, setIsScrapeResultsDialogOpen] = useState(false);
 
     const prospectsCollectionRef = useMemo(() => collection(db, 'prospects'), []);
 
@@ -36,25 +51,15 @@ export default function ProspectsPage() {
                 return { 
                     id: doc.id, 
                     ...data,
+                    createdAt: data.createdAt?.toDate ? format(data.createdAt.toDate(), 'dd/MM/yyyy') : 'N/A',
                     nextFollowUp: data.nextFollowUp && data.nextFollowUp.toDate ? format(data.nextFollowUp.toDate(), 'yyyy-MM-dd') : undefined
                 } as Prospect;
             });
-            setProspects(prospectsData);
+            setProspects(prospectsData.sort((a,b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()));
             setIsLoading(false);
         });
         return () => unsubscribe();
     }, [prospectsCollectionRef]);
-
-    const prospectsByStage = useMemo(() => {
-        const grouped: { [key in Prospect['stage']]?: Prospect[] } = {};
-        prospects.forEach(p => {
-            if (!grouped[p.stage]) {
-                grouped[p.stage] = [];
-            }
-            grouped[p.stage]!.push(p);
-        });
-        return grouped;
-    }, [prospects]);
 
     const handleOpenDialog = (prospect: Partial<Prospect> | null) => {
         setCurrentProspect(prospect);
@@ -78,7 +83,7 @@ export default function ProspectsPage() {
         };
 
         if (!prospectData.name || !prospectData.contact || !prospectData.stage) {
-            toast({ title: "Campos obrigatórios", description: "Nome, contato e etapa são obrigatórios.", variant: "destructive" });
+            toast({ title: "Campos obrigatórios", variant: "destructive" });
             setIsSaving(false);
             return;
         }
@@ -87,15 +92,14 @@ export default function ProspectsPage() {
             if (currentProspect && currentProspect.id) {
                 const docRef = doc(db, 'prospects', currentProspect.id);
                 await updateDoc(docRef, prospectData);
-                toast({ title: "Prospect Atualizado!", description: "O prospect foi atualizado com sucesso." });
+                toast({ title: "Prospect Atualizado!", description: "O prospect foi atualizado." });
             } else {
                 await addDoc(prospectsCollectionRef, { ...prospectData, createdAt: serverTimestamp() });
                 toast({ title: "Prospect Adicionado!", description: "O novo prospect foi criado." });
             }
             handleCloseDialog();
         } catch (error) {
-            console.error("Error saving prospect:", error);
-            toast({ title: "Erro ao salvar", description: "Não foi possível salvar o prospect.", variant: "destructive" });
+            toast({ title: "Erro ao salvar", variant: "destructive" });
         } finally {
             setIsSaving(false);
         }
@@ -104,26 +108,62 @@ export default function ProspectsPage() {
     const handleDelete = async (prospectId: string) => {
         try {
             await deleteDoc(doc(db, 'prospects', prospectId));
-            toast({ title: "Prospect Removido!", description: "O prospect foi removido com sucesso." });
+            toast({ title: "Prospect Removido!", variant: "destructive" });
         } catch (error) {
-            toast({ title: "Erro ao remover", description: "Não foi possível remover o prospect.", variant: "destructive" });
+            toast({ title: "Erro ao remover", variant: "destructive" });
         }
     };
     
-    const handleStageChange = async (prospectId: string, newStage: Prospect['stage']) => {
-        const prospectRef = doc(db, 'prospects', prospectId);
+    const handleScrape = async () => {
+        if (!scrapeQuery.query || !scrapeQuery.location) {
+            toast({ title: 'Campos obrigatórios', description: 'Nicho e Localização são necessários para a busca.', variant: 'destructive' });
+            return;
+        }
+        setIsScraping(true);
+        setScrapedResults([]);
         try {
-            await updateDoc(prospectRef, { stage: newStage });
+            const results = await runProspectScraper({
+                query: `${scrapeQuery.query} em ${scrapeQuery.location}`,
+                limit: scrapeQuery.limit,
+            });
+            setScrapedResults(results);
+            if (results.length > 0) {
+                 setIsScrapeResultsDialogOpen(true);
+            }
+            toast({ title: 'Busca Concluída!', description: `${results.length} prospects encontrados.` });
         } catch (error) {
-            console.error("Error updating prospect stage:", error);
-            toast({ title: "Erro ao mover prospect", variant: "destructive" });
+            toast({ title: "Erro na Busca", description: (error as Error).message || "Não foi possível buscar os prospects. Verifique sua chave de API e tente novamente.", variant: "destructive" });
+        } finally {
+            setIsScraping(false);
         }
     };
 
+    const handleSaveAllScraped = async () => {
+        if (scrapedResults.length === 0) return;
+        setIsSavingAll(true);
+        const batch = writeBatch(db);
+        scrapedResults.forEach(prospect => {
+            const newProspect: Omit<Prospect, 'id'> = {
+                name: prospect.name,
+                contact: prospect.contact,
+                stage: 'Contato Inicial',
+                createdAt: serverTimestamp(),
+            };
+            const prospectRef = doc(prospectsCollectionRef);
+            batch.set(prospectRef, newProspect);
+        });
 
-    if (isLoading) {
-        return <div className="flex justify-center items-center h-64"><Loader2 className="h-8 w-8 animate-spin" /></div>;
-    }
+        try {
+            await batch.commit();
+            toast({ title: 'Prospects Salvos!', description: `${scrapedResults.length} novos prospects foram adicionados à sua lista.` });
+            setScrapedResults([]);
+            setIsScrapeResultsDialogOpen(false);
+        } catch (error) {
+            toast({ title: "Erro ao Salvar", variant: "destructive" });
+        } finally {
+            setIsSavingAll(false);
+        }
+    };
 
     return (
         <div className="space-y-6">
@@ -134,88 +174,130 @@ export default function ProspectsPage() {
                     Adicionar Prospect
                 </Button>
             </div>
-            
-            <div className="flex gap-4 overflow-x-auto pb-4">
-                {STAGES.map(stage => (
-                    <div key={stage} className="w-72 flex-shrink-0">
-                        <Card className="h-full bg-card/50">
-                            <CardHeader>
-                                <CardTitle className="flex justify-between items-center text-base">
-                                    <span>{stage}</span>
-                                    <span className="text-sm font-normal text-muted-foreground">{prospectsByStage[stage]?.length || 0}</span>
-                                </CardTitle>
-                            </CardHeader>
-                            <CardContent className="space-y-2">
-                                {(prospectsByStage[stage] || []).map(prospect => (
-                                    <Card key={prospect.id} className="p-3 bg-secondary/50">
-                                        <div className="flex justify-between items-start">
-                                            <p className="font-semibold text-sm">{prospect.name}</p>
-                                             <DropdownMenu>
-                                                <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-6 w-6"><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger>
-                                                <DropdownMenuContent>
-                                                    <DropdownMenuItem onClick={() => handleOpenDialog(prospect)}><Edit className="mr-2 h-4 w-4" /> Editar</DropdownMenuItem>
-                                                    <AlertDialog>
-                                                        <AlertDialogTrigger asChild><DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-destructive focus:bg-destructive/10 focus:text-destructive"><Trash2 className="mr-2 h-4 w-4" /> Excluir</DropdownMenuItem></AlertDialogTrigger>
-                                                        <AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Tem certeza?</AlertDialogTitle></AlertDialogHeader><AlertDialogDescription>Esta ação não pode ser desfeita e removerá o prospect permanentemente.</AlertDialogDescription>
-                                                            <AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={() => handleDelete(prospect.id)} className="bg-destructive hover:bg-destructive/90 text-destructive-foreground">Excluir</AlertDialogAction></AlertDialogFooter>
-                                                        </AlertDialogContent>
-                                                    </AlertDialog>
-                                                </DropdownMenuContent>
-                                            </DropdownMenu>
-                                        </div>
-                                        <p className="text-xs text-muted-foreground">{prospect.contact}</p>
-                                        {prospect.nextFollowUp && <p className="text-xs text-muted-foreground mt-1">Follow-up: {new Date(prospect.nextFollowUp).toLocaleDateString('pt-BR', {timeZone: 'UTC'})}</p>}
-                                        <Select value={prospect.stage} onValueChange={(newStage) => handleStageChange(prospect.id, newStage as Prospect['stage'])}>
-                                            <SelectTrigger className="h-7 text-xs mt-2"><SelectValue /></SelectTrigger>
-                                            <SelectContent>{STAGES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
-                                        </Select>
-                                    </Card>
-                                ))}
-                            </CardContent>
-                        </Card>
+
+            <Card>
+                <CardHeader>
+                    <CardTitle className="font-headline">Prospecção Automática com IA</CardTitle>
+                    <CardDescription>Use a API da Outscraper para encontrar novos leads no Google Maps e adicioná-los diretamente ao seu funil.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div className="space-y-2">
+                            <Label htmlFor="query">Nicho / Termo de Busca</Label>
+                            <Input id="query" value={scrapeQuery.query} onChange={e => setScrapeQuery({...scrapeQuery, query: e.target.value})} placeholder="Ex: Restaurantes, Advogados" />
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="location">Localização</Label>
+                            <Input id="location" value={scrapeQuery.location} onChange={e => setScrapeQuery({...scrapeQuery, location: e.target.value})} placeholder="Ex: São Paulo, Brasil" />
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="limit">Quantidade</Label>
+                            <Input id="limit" type="number" value={scrapeQuery.limit} onChange={e => setScrapeQuery({...scrapeQuery, limit: parseInt(e.target.value, 10)})} />
+                        </div>
                     </div>
-                ))}
-            </div>
+                    <Button onClick={handleScrape} disabled={isScraping}>
+                        {isScraping ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Wand2 className="mr-2 h-4 w-4" />}
+                        {isScraping ? 'Buscando Prospects...' : 'Buscar Prospects'}
+                    </Button>
+                </CardContent>
+            </Card>
+
+            <Card>
+                <CardHeader>
+                    <CardTitle>Lista de Prospects</CardTitle>
+                </CardHeader>
+                <CardContent>
+                {isLoading ? (
+                    <div className="flex justify-center items-center h-48"><Loader2 className="h-8 w-8 animate-spin" /></div>
+                ) : (
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead>Nome</TableHead>
+                                <TableHead>Contato</TableHead>
+                                <TableHead>Etapa</TableHead>
+                                <TableHead>Próximo Contato</TableHead>
+                                <TableHead className="text-right">Ações</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {prospects.length > 0 ? prospects.map((prospect) => (
+                                <TableRow key={prospect.id}>
+                                    <TableCell className="font-medium">{prospect.name}</TableCell>
+                                    <TableCell>{prospect.contact}</TableCell>
+                                    <TableCell>{prospect.stage}</TableCell>
+                                    <TableCell>{prospect.nextFollowUp ? new Date(prospect.nextFollowUp).toLocaleDateString('pt-BR', {timeZone: 'UTC'}) : 'N/A'}</TableCell>
+                                    <TableCell className="text-right">
+                                        <DropdownMenu>
+                                            <DropdownMenuTrigger asChild>
+                                                <Button variant="ghost" size="icon" className="h-8 w-8"><MoreVertical className="h-4 w-4" /></Button>
+                                            </DropdownMenuTrigger>
+                                            <DropdownMenuContent>
+                                                <DropdownMenuItem onClick={() => handleOpenDialog(prospect)}><Edit className="mr-2 h-4 w-4" /> Editar</DropdownMenuItem>
+                                                <AlertDialog>
+                                                    <AlertDialogTrigger asChild>
+                                                        <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-destructive focus:bg-destructive/10 focus:text-destructive"><Trash2 className="mr-2 h-4 w-4" /> Excluir</DropdownMenuItem>
+                                                    </AlertDialogTrigger>
+                                                    <AlertDialogContent>
+                                                        <AlertDialogHeader><AlertDialogTitle>Tem certeza?</AlertDialogTitle></AlertDialogHeader>
+                                                        <AlertDialogDescription>Esta ação não pode ser desfeita.</AlertDialogDescription>
+                                                        <AlertDialogFooter>
+                                                            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                                            <AlertDialogAction onClick={() => handleDelete(prospect.id)} className="bg-destructive hover:bg-destructive/90 text-destructive-foreground">Excluir</AlertDialogAction>
+                                                        </AlertDialogFooter>
+                                                    </AlertDialogContent>
+                                                </AlertDialog>
+                                            </DropdownMenuContent>
+                                        </DropdownMenu>
+                                    </TableCell>
+                                </TableRow>
+                            )) : (
+                                <TableRow><TableCell colSpan={5} className="h-24 text-center">Nenhum prospect encontrado.</TableCell></TableRow>
+                            )}
+                        </TableBody>
+                    </Table>
+                )}
+                </CardContent>
+            </Card>
 
             <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
                 <DialogContent>
                     <DialogHeader>
                         <DialogTitle>{currentProspect?.id ? 'Editar Prospect' : 'Adicionar Novo Prospect'}</DialogTitle>
-                        <DialogDescription>
-                            Preencha as informações abaixo para gerenciar o prospect.
-                        </DialogDescription>
                     </DialogHeader>
                     <form onSubmit={handleSubmit} className="space-y-4">
-                        <div>
-                            <Label htmlFor="name">Nome do Prospect</Label>
-                            <Input id="name" name="name" defaultValue={currentProspect?.name} required />
-                        </div>
-                        <div>
-                            <Label htmlFor="contact">Contato (Telefone/Email/Site)</Label>
-                            <Input id="contact" name="contact" defaultValue={currentProspect?.contact} required />
-                        </div>
-                         <div>
-                            <Label htmlFor="stage">Etapa do Funil</Label>
+                        <div><Label htmlFor="name">Nome do Prospect</Label><Input id="name" name="name" defaultValue={currentProspect?.name} required /></div>
+                        <div><Label htmlFor="contact">Contato (Telefone/Email/Site)</Label><Input id="contact" name="contact" defaultValue={currentProspect?.contact} required /></div>
+                        <div><Label htmlFor="stage">Etapa do Funil</Label>
                             <Select name="stage" defaultValue={currentProspect?.stage || 'Contato Inicial'}>
-                                <SelectTrigger id="stage"><SelectValue placeholder="Selecione a etapa" /></SelectTrigger>
+                                <SelectTrigger id="stage"><SelectValue /></SelectTrigger>
                                 <SelectContent>{STAGES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
                             </Select>
                         </div>
-                        <div>
-                            <Label htmlFor="nextFollowUp">Próximo Follow-up</Label>
-                            <Input id="nextFollowUp" name="nextFollowUp" type="date" defaultValue={currentProspect?.nextFollowUp} />
-                        </div>
+                        <div><Label htmlFor="nextFollowUp">Próximo Follow-up</Label><Input id="nextFollowUp" name="nextFollowUp" type="date" defaultValue={currentProspect?.nextFollowUp} /></div>
                         <DialogFooter>
                             <Button type="button" variant="outline" onClick={handleCloseDialog}>Cancelar</Button>
-                            <Button type="submit" disabled={isSaving}>
-                                {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                                Salvar
-                            </Button>
+                            <Button type="submit" disabled={isSaving}>{isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null} Salvar</Button>
                         </DialogFooter>
                     </form>
                 </DialogContent>
             </Dialog>
+            
+            <AlertDialog open={isScrapeResultsDialogOpen} onOpenChange={setIsScrapeResultsDialogOpen}>
+                <AlertDialogContent className="max-w-4xl">
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Resultados da Busca ({scrapedResults.length} encontrados)</AlertDialogTitle>
+                        <AlertDialogDescription>Revise os prospects encontrados e salve na sua lista de prospecção.</AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <div className="max-h-96 overflow-y-auto"><pre className="text-xs p-4 bg-muted rounded-md">{JSON.stringify(scrapedResults, null, 2)}</pre></div>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Fechar</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleSaveAllScraped} disabled={isSavingAll}>
+                            {isSavingAll ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Save className="mr-2 h-4 w-4" />} Salvar Todos
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </div>
     );
 }
-
