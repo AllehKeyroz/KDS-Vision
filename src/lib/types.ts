@@ -114,7 +114,8 @@ export interface Appointment {
   id: string;
   title: string;
   date: Date; // Stored as Timestamp in Firestore, converted to Date on client
-  userId: string;
+  userIds: string[];
+  clientId?: string;
   notes?: string;
 }
 

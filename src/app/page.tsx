@@ -5,7 +5,7 @@ import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Briefcase, Users, ArrowRight, FolderKanban, ListTodo, Filter, CalendarIcon as CalendarIconLucide, User as UserIcon, PlusCircle, CheckCircle2, Loader2 } from 'lucide-react';
+import { Briefcase, Users, ArrowRight, FolderKanban, ListTodo, Filter, CalendarIcon as CalendarIconLucide, User as UserIcon, PlusCircle, CheckCircle2, Loader2, Check, ChevronsUpDown } from 'lucide-react';
 import { db } from '@/lib/firebase';
 import { collection, onSnapshot, query, where, Timestamp, addDoc, doc, updateDoc, deleteDoc } from 'firebase/firestore';
 import type { Client, Prospect, Project, Task, User, Appointment } from '@/lib/types';
@@ -14,7 +14,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
-import { format } from 'date-fns';
+import { format, addMinutes, setHours, setMinutes } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger, DialogClose, DialogFooter } from '@/components/ui/dialog';
@@ -23,6 +23,9 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { ptBR } from 'date-fns/locale';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
+import { Badge } from '@/components/ui/badge';
+
 
 export default function DashboardPage() {
   const { toast } = useToast();
@@ -38,7 +41,7 @@ export default function DashboardPage() {
   const [filters, setFilters] = useState({ responsible: '', deadline: null as Date | null });
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
   const [isAppointmentDialogOpen, setIsAppointmentDialogOpen] = useState(false);
-  const [newAppointment, setNewAppointment] = useState<{ title: string; notes: string; userId: string }>({ title: '', notes: '', userId: '' });
+  const [newAppointment, setNewAppointment] = useState<{ title: string; notes: string; userIds: string[], clientId?: string }>({ title: '', notes: '', userIds: [] });
 
   useEffect(() => {
     const unsubscribes: (() => void)[] = [];
@@ -118,8 +121,8 @@ export default function DashboardPage() {
   
   const handleAddAppointment = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newAppointment.title || !newAppointment.userId || !selectedDate) {
-        toast({ title: 'Campos obrigatórios', description: 'Título e responsável são necessários.', variant: 'destructive' });
+    if (!newAppointment.title || newAppointment.userIds.length === 0 || !selectedDate) {
+        toast({ title: 'Campos obrigatórios', description: 'Título e ao menos um responsável são necessários.', variant: 'destructive' });
         return;
     }
     setIsSaving(true);
@@ -130,7 +133,7 @@ export default function DashboardPage() {
         });
         toast({ title: 'Compromisso Adicionado!', description: 'O novo compromisso foi salvo.' });
         setIsAppointmentDialogOpen(false);
-        setNewAppointment({ title: '', notes: '', userId: '' });
+        setNewAppointment({ title: '', notes: '', userIds: [] });
     } catch (error) {
         toast({ title: 'Erro ao salvar', variant: 'destructive' });
     } finally {
@@ -146,6 +149,26 @@ export default function DashboardPage() {
   const appointmentDates = useMemo(() => {
       return appointments.map(app => app.date);
   }, [appointments]);
+
+  const timeSlots = useMemo(() => {
+    if (!selectedDate) return [];
+    const startOfDay = setMinutes(setHours(selectedDate, 8), 0);
+    const endOfDay = setMinutes(setHours(selectedDate, 18), 0);
+    const slots = [];
+    let currentTime = startOfDay;
+
+    const dailyAppointments = appointments.filter(app => format(app.date, 'yyyy-MM-dd') === format(selectedDate, 'yyyy-MM-dd'));
+
+    while (currentTime < endOfDay) {
+      const isBooked = dailyAppointments.some(app => {
+        const appTime = app.date.getTime();
+        return appTime >= currentTime.getTime() && appTime < addMinutes(currentTime, 30).getTime();
+      });
+      slots.push({ time: currentTime, booked: isBooked });
+      currentTime = addMinutes(currentTime, 30);
+    }
+    return slots;
+  }, [selectedDate, appointments]);
 
 
   const calculateProgress = (project: Project): number => {
@@ -376,7 +399,7 @@ export default function DashboardPage() {
                     locale={ptBR}
                     modifiers={{ scheduled: appointmentDates }}
                     modifiersClassNames={{
-                        scheduled: 'bg-primary/20 text-primary-foreground rounded-full',
+                        scheduled: 'relative after:absolute after:bottom-1 after:left-1/2 after:-translate-x-1/2 after:w-1 after:h-1 after:rounded-full after:bg-primary',
                     }}
                 />
                  <div className="mt-4 space-y-2">
@@ -386,7 +409,7 @@ export default function DashboardPage() {
                         {dailyAppointments.map(app => (
                             <div key={app.id} className="text-sm p-2 rounded-md bg-secondary/50 mb-1">
                                 <p className="font-bold">{app.title}</p>
-                                <p className="text-xs text-muted-foreground">Responsável: {users.find(u => u.id === app.userId)?.name || 'N/A'}</p>
+                                <p className="text-xs text-muted-foreground">Responsáveis: {app.userIds.map(uid => users.find(u => u.id === uid)?.name || '').join(', ')}</p>
                                 {app.notes && <p className="text-xs mt-1">{app.notes}</p>}
                             </div>
                         ))}
@@ -400,43 +423,116 @@ export default function DashboardPage() {
       </div>
 
        <Dialog open={isAppointmentDialogOpen} onOpenChange={setIsAppointmentDialogOpen}>
-        <DialogContent>
+        <DialogContent className="sm:max-w-[625px]">
             <DialogHeader>
                 <DialogTitle>Adicionar Compromisso</DialogTitle>
                 <DialogDescription>
                     Agende um novo compromisso para {selectedDate ? format(selectedDate, 'PPP', {locale: ptBR}) : ''}.
                 </DialogDescription>
             </DialogHeader>
-            <form onSubmit={handleAddAppointment} className="space-y-4">
-                <div>
-                    <Label htmlFor="title">Título do Compromisso</Label>
-                    <Input id="title" value={newAppointment.title} onChange={e => setNewAppointment(p => ({...p, title: e.target.value}))} required />
-                </div>
-                <div>
-                    <Label htmlFor="userId">Atribuir a</Label>
-                    <Select onValueChange={value => setNewAppointment(p => ({...p, userId: value}))} required>
-                        <SelectTrigger id="userId">
-                            <SelectValue placeholder="Selecione um membro da equipe" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            {users.map(user => (
-                                <SelectItem key={user.id} value={user.id}>{user.name}</SelectItem>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <form onSubmit={handleAddAppointment} className="space-y-4">
+                    <div>
+                        <Label htmlFor="title">Título do Compromisso</Label>
+                        <Input id="title" value={newAppointment.title} onChange={e => setNewAppointment(p => ({...p, title: e.target.value}))} required />
+                    </div>
+                    <div>
+                        <Label>Atribuir a</Label>
+                        <Popover>
+                            <PopoverTrigger asChild>
+                            <Button
+                                variant="outline"
+                                role="combobox"
+                                className="w-full justify-between"
+                            >
+                                {newAppointment.userIds.length > 0
+                                ? `${newAppointment.userIds.length} selecionado(s)`
+                                : "Selecione os membros..."}
+                                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                            </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-full p-0">
+                            <Command>
+                                <CommandInput placeholder="Procurar membro..." />
+                                <CommandEmpty>Nenhum membro encontrado.</CommandEmpty>
+                                <CommandGroup>
+                                <CommandList>
+                                    {users.map((user) => (
+                                    <CommandItem
+                                        key={user.id}
+                                        onSelect={() => {
+                                        setNewAppointment(p => {
+                                            const newIds = p.userIds.includes(user.id)
+                                            ? p.userIds.filter(id => id !== user.id)
+                                            : [...p.userIds, user.id];
+                                            return {...p, userIds: newIds};
+                                        })
+                                        }}
+                                    >
+                                        <Check
+                                        className={cn(
+                                            "mr-2 h-4 w-4",
+                                            newAppointment.userIds.includes(user.id) ? "opacity-100" : "opacity-0"
+                                        )}
+                                        />
+                                        {user.name}
+                                    </CommandItem>
+                                    ))}
+                                </CommandList>
+                                </CommandGroup>
+                            </Command>
+                            </PopoverContent>
+                        </Popover>
+                        <div className="pt-2 flex flex-wrap gap-1">
+                            {newAppointment.userIds.map(id => {
+                                const user = users.find(u => u.id === id);
+                                return user ? <Badge key={id} variant="secondary">{user.name}</Badge> : null;
+                            })}
+                        </div>
+                    </div>
+                     <div>
+                        <Label htmlFor="clientId">Cliente (Opcional)</Label>
+                        <Select onValueChange={value => setNewAppointment(p => ({...p, clientId: value}))}>
+                            <SelectTrigger id="clientId">
+                                <SelectValue placeholder="Selecione um cliente" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="none">Nenhum</SelectItem>
+                                {clients.map(client => (
+                                    <SelectItem key={client.id} value={client.id}>{client.name}</SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </div>
+                     <div>
+                        <Label htmlFor="notes">Notas (Opcional)</Label>
+                        <Textarea id="notes" value={newAppointment.notes} onChange={e => setNewAppointment(p => ({...p, notes: e.target.value}))} />
+                    </div>
+                    <DialogFooter>
+                        <DialogClose asChild><Button type="button" variant="outline">Cancelar</Button></DialogClose>
+                        <Button type="submit" disabled={isSaving}>
+                            {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                            Salvar Compromisso
+                        </Button>
+                    </DialogFooter>
+                </form>
+                <div className="space-y-2">
+                    <h3 className="text-sm font-medium">Disponibilidade do Dia</h3>
+                    <ScrollArea className="h-80 border rounded-md p-2">
+                        <div className="space-y-1">
+                            {timeSlots.map(slot => (
+                                <div key={slot.time.toISOString()} className={cn(
+                                    "p-2 rounded-md text-xs flex justify-between items-center",
+                                    slot.booked ? "bg-red-900/50 text-muted-foreground" : "bg-secondary"
+                                )}>
+                                    <span>{format(slot.time, 'HH:mm')} - {format(addMinutes(slot.time, 30), 'HH:mm')}</span>
+                                    <Badge variant={slot.booked ? "destructive" : "default"}>{slot.booked ? "Ocupado" : "Livre"}</Badge>
+                                </div>
                             ))}
-                        </SelectContent>
-                    </Select>
+                        </div>
+                    </ScrollArea>
                 </div>
-                 <div>
-                    <Label htmlFor="notes">Notas (Opcional)</Label>
-                    <Textarea id="notes" value={newAppointment.notes} onChange={e => setNewAppointment(p => ({...p, notes: e.target.value}))} />
-                </div>
-                <DialogFooter>
-                    <DialogClose asChild><Button type="button" variant="outline">Cancelar</Button></DialogClose>
-                    <Button type="submit" disabled={isSaving}>
-                        {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                        Salvar Compromisso
-                    </Button>
-                </DialogFooter>
-            </form>
+            </div>
         </DialogContent>
        </Dialog>
     </div>
