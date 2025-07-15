@@ -4,7 +4,7 @@ KDS-Vision é uma plataforma de gerenciamento completa, projetada para agências
 
 ## ✨ Funcionalidades Principais
 
-- **Dashboard Centralizado**: Uma visão geral do seu negócio com métricas de clientes, projetos em andamento e um painel de tarefas pendentes organizadas por urgência.
+- **Dashboard Centralizado**: Uma visão geral do seu negócio com métricas de clientes, projetos em andamento, calendário de compromissos e um painel de tarefas pendentes organizadas por urgência.
 - **Gestão de Clientes (CRM)**: Adicione, edite e gerencie todos os seus clientes, com informações de contato, contexto de negócios e acesso rápido aos seus projetos.
 - **Gestão de Projetos Avançada**:
     - Crie projetos com escopo, valor e status.
@@ -18,8 +18,30 @@ KDS-Vision é uma plataforma de gerenciamento completa, projetada para agências
     - **Social Strategist IA**: Crie ideias de posts e estratégias de conteúdo para redes sociais.
     - **Brainstorming com IA**: Gere ideias e tarefas acionáveis para os desafios de seus clientes.
     - **Gerenciamento de Agentes de IA**: Crie agentes de IA com prompts personalizados para cada cliente.
+    - **Prospecção Automática**: Encontre novos leads usando a API da Outscraper para buscar empresas no Google Maps.
 
-## 🚀 Stack de Tecnologia
+---
+
+## 🚀 Roadmap de Novas Funcionalidades
+
+Abaixo estão as próximas grandes funcionalidades planejadas para o KDS-Vision.
+
+### 1. Módulo Financeiro e de Projetos (Foco em Lucratividade) - *Em Desenvolvimento*
+
+- [x] **Time Tracking por Tarefa (Base)**: Permite registrar o total de horas gastas em cada tarefa.
+- [x] **Relatório de Rentabilidade (Base)**: Usa um "Custo Estimado" para calcular uma margem de lucro inicial do projeto.
+- [ ] **Próximo Passo: Time Tracking por Usuário e Custo por Hora**: Adicionar um custo/hora para cada membro da equipe e associar as horas registradas a um usuário para calcular o custo real e a rentabilidade precisa do projeto.
+- [ ] **Contratos e Retainers (Recorrência)**: Módulo para gerenciar contratos de fee mensal e automatizar o lançamento de receitas recorrentes.
+
+### 2. Comunicação e Relacionamento com o Cliente (Foco em Retenção) - *Planejado*
+
+- [ ] **Portal do Cliente (Client-Facing)**: Uma área para o cliente fazer login, acompanhar o progresso de seus projetos e acessar arquivos.
+- [ ] **Relatórios Automatizados de Desempenho**: Integração com APIs (Google, Meta) para gerar relatórios automáticos de desempenho para os clientes.
+
+---
+
+
+## Stack de Tecnologia
 
 - **Framework**: [Next.js](https://nextjs.org/) (com App Router)
 - **Linguagem**: [TypeScript](https://www.typescriptlang.org/)
