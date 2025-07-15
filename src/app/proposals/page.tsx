@@ -175,7 +175,14 @@ export default function ProposalsPage() {
                                     const { status, className } = getStatusInfo(proposal);
                                     return (
                                     <TableRow key={proposal.id}>
-                                        <TableCell className="font-medium">{proposal.title}</TableCell>
+                                        <TableCell className="font-medium">
+                                            <div>{proposal.title}</div>
+                                            {proposal.validityBenefit && (
+                                                <p className="text-xs text-muted-foreground mt-1">
+                                                    Benefício: {proposal.validityBenefit}
+                                                </p>
+                                            )}
+                                        </TableCell>
                                         <TableCell className="text-muted-foreground">{proposal.clientName}</TableCell>
                                         <TableCell className="text-muted-foreground">{formatCurrency(proposal.value)}</TableCell>
                                         <TableCell><Badge className={className}>{status}</Badge></TableCell>
