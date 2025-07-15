@@ -33,7 +33,9 @@ RUN addgroup --system --gid 1001 nodejs && \
 # Copia artefatos standalone
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
-COPY --from=builder --chown=nextjs:nodejs /app/public ./public || true
+
+# ❌ REMOVIDO: COPY do public que causava erro
+# Se quiser copiar a pasta public, primeiro crie-a mesmo que esteja vazia.
 
 USER nextjs
 
