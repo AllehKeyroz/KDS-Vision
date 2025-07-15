@@ -89,7 +89,7 @@ export interface Project {
   status: 'Planejamento' | 'Em Andamento' | 'Pausado' | 'Concluído';
   sections?: ProjectSection[];
   createdAt?: any;
-  clientId: string; // Add this line
+  clientId: string;
 }
 
 
@@ -118,6 +118,21 @@ export interface FinancialTransaction {
   date: any; // Firestore Timestamp
   category?: string;
   recurring: boolean;
+  // Fields for automated invoices from contracts
+  invoiceId?: string; // Unique ID for the invoice, e.g., `contractId_YYYY_MM`
+  contractId?: string;
+  clientId?: string;
+}
+
+export interface Contract {
+    id: string;
+    clientId: string;
+    clientName: string;
+    title: string;
+    amount: number;
+    startDate: Timestamp;
+    status: 'active' | 'paused' | 'cancelled';
+    createdAt: Timestamp;
 }
 
 export interface Appointment {
