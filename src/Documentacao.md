@@ -7,11 +7,11 @@ Este documento serve como um raio-x do estado atual do projeto, detalhando as fu
 
 | ID    | Módulo                       | Status      | Funcionalidade                                                                                                         |
 | :---- | :--------------------------- | :---------- | :--------------------------------------------------------------------------------------------------------------------- |
-| **1.1** | Estratégia e Planejamento      |  **Concluído** | Diagnóstico de Marketing 360°                                                                                          |
+| **1.1** | Estratégia e Planejamento      |  **Concluído** | Diagnóstico de Marketing 360° - Base (Playbooks)                                                                       |
 | **1.2** | Estratégia e Planejamento      | **Concluído** | Construtor de Persona e ICP - Base (Contexto do Cliente)                                                              |
 | **1.3** | Estratégia e Planejamento      | পেন্ডিং | Mapa de Jornada do Cliente                                                                                             |
 | **1.4** | Estratégia e Planejamento      | পেন্ডিং | Planejador Estratégico Anual/Trimestral                                                                                |
-| **2.1** | Operações e Execução           | পেন্ডিং | Gestão de Funis de Vendas e Marketing                                                                                  |
+| **2.1** | Operações e Execução           | **Em Andamento** | Gestão de Funis de Vendas e Marketing - Base (Funil Kanban)                                                            |
 | **2.2** | Operações e Execução           | **Concluído** | Calendário de Conteúdo Centralizado                                                                                    |
 | **2.3** | Operações e Execução           | **Concluído** | Banco de Ativos Digitais (DAM) - Base (Links e Acessos)                                                                  |
 | **2.4** | Operações e Execução           | **Concluído** | Gestão de Campanhas de Mídia Paga - Base (Salvar Campanhas)                                                              |
@@ -80,8 +80,8 @@ Este documento serve como um raio-x do estado atual do projeto, detalhando as fu
   - **Descrição:** Permite criar propostas comerciais com escopo, valor e data de validade. As propostas têm um ciclo de vida com status (Rascunho, Enviada, Aceita, Recusada, Expirada). Inclui um campo para "Benefício por Fechamento Rápido".
 - **(ID 3.2) Gestão Financeira (`/src/app/financials/page.tsx`):**
   - **Descrição:** Página para gerenciamento financeiro. Inclui um dashboard com balanço total, MRR (Receita Recorrente Mensal) e CRR (Custo Recorrente Mensal). Permite o cadastro manual de transações e a gestão de contratos recorrentes e despesas recorrentes. Lança faturas automaticamente com base nos contratos ativos.
-- **Funil de Prospecção (`/src/app/prospects/page.tsx`):**
-  - **Descrição:** Permite gerenciar leads e prospects em diferentes etapas do funil de vendas. Inclui uma ferramenta de prospecção automática via API da Outscraper.
+- **(ID 2.1) Funil de Prospecção (`/src/app/prospects/page.tsx`):**
+  - **Descrição:** Permite gerenciar leads e prospects em diferentes etapas do funil de vendas em um painel Kanban. Inclui uma ferramenta de prospecção automática via API da Outscraper (localizada em Agency > Chaves de API).
 
 ---
 
@@ -91,14 +91,12 @@ Este documento serve como um raio-x do estado atual do projeto, detalhando as fu
     - `1.3. Mapa de Jornada do Cliente:` Desenvolver uma ferramenta visual (possivelmente usando uma biblioteca de diagramas) para mapear os pontos de contato do cliente.
     - `1.4. Planejador Estratégico:` Criar uma nova seção para definir OKRs (Objetivos e Resultados-Chave) e alocar orçamentos para períodos específicos (trimestre/ano).
 
-2.  **Módulo 2: Operações e Execução (Os Músculos da Agência)**
-    - `2.1. Gestão de Funis de Vendas e Marketing:` Criar uma visualização em Kanban para os funis de marketing e vendas, conectando as etapas às campanhas e tarefas existentes.
-
-3.  **Módulo 3: Relacionamento e Colaboração (O Coração da Agência)** - **NÃO INICIADO**
+2.  **Módulo 3: Relacionamento e Colaboração (O Coração da Agência)** - **NÃO INICIADO**
     - `3.1. Portal do Cliente:` Desenvolver uma área segura de login para clientes, onde eles possam ver o progresso dos projetos e relatórios. Requer implementação de autenticação para clientes.
     - `3.3. Sistema de Aprovação Integrado:` Adicionar um status de "Aguardando Aprovação" nas tarefas e criativos. Notificar o cliente (via Portal do Cliente) para que ele possa aprovar ou solicitar revisão.
 
-4.  **Módulo 4: Análise e Inteligência (A Prova de Valor)** - **NÃO INICIADO**
+3.  **Módulo 4: Análise e Inteligência (A Prova de Valor)** - **NÃO INICIADO**
     - `4.1. Dashboard de ROI por Cliente:` Criar um novo dashboard no perfil do cliente que cruze os dados do módulo financeiro (investimento) com métricas de resultado (a serem definidas, como leads ou vendas) para calcular o ROI.
     - `4.2. Análise de Rentabilidade da Agência:` Desenvolver um dashboard de alto nível (possivelmente em `/financials`) que consolide a margem de lucro de todos os projetos para identificar os clientes mais e menos rentáveis.
     - `4.3. Benchmarking de Performance:` Funcionalidade complexa que dependeria de uma base de dados anônima para comparar o desempenho de campanhas entre clientes do mesmo nicho.
+
