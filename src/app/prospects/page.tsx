@@ -3,10 +3,10 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import type { Prospect } from "@/lib/types";
-import { PlusCircle, Loader2, MoreVertical, Edit, Trash2 } from "lucide-react";
+import { PlusCircle, Loader2, MoreVertical, Edit, Trash2, Wand2 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogTrigger, DialogClose } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -17,6 +17,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { format } from 'date-fns';
+import { runProspectScraper } from '@/app/actions';
+
+type ScrapedProspect = Omit<Prospect, 'id' | 'stage' | 'createdAt' | 'nextFollowUp'> & { phones?: string; emails?: string };
 
 export default function ProspectsPage() {
     const [prospects, setProspects] = useState<Prospect[]>([]);
@@ -25,6 +28,11 @@ export default function ProspectsPage() {
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const [currentProspect, setCurrentProspect] = useState<Partial<Prospect> | null>(null);
     const { toast } = useToast();
+
+    // State for the scraper
+    const [isScraping, setIsScraping] = useState(false);
+    const [scrapeQuery, setScrapeQuery] = useState({ query: '', location: '', limit: 10 });
+    const [scrapedResults, setScrapedResults] = useState<ScrapedProspect[]>([]);
 
     const prospectsCollectionRef = useMemo(() => collection(db, 'prospects'), []);
 
@@ -35,11 +43,10 @@ export default function ProspectsPage() {
                 return { 
                     id: doc.id, 
                     ...data,
-                    // Convert Firestore Timestamp to string for input[type=date]
                     nextFollowUp: data.nextFollowUp && data.nextFollowUp.toDate ? format(data.nextFollowUp.toDate(), 'yyyy-MM-dd') : undefined
                 } as Prospect;
             });
-            setProspects(prospectsData);
+            setProspects(prospectsData.sort((a, b) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0)));
             setIsLoading(false);
         });
         return () => unsubscribe();
@@ -99,18 +106,131 @@ export default function ProspectsPage() {
         }
     };
 
+    const handleScrape = async () => {
+        if (!scrapeQuery.query || !scrapeQuery.location) {
+            toast({ title: 'Campos obrigatórios', description: 'Nicho e Localização são necessários para a busca.', variant: 'destructive' });
+            return;
+        }
+        setIsScraping(true);
+        setScrapedResults([]);
+        try {
+            const results = await runProspectScraper({
+                query: `${scrapeQuery.query} em ${scrapeQuery.location}`,
+                limit: scrapeQuery.limit
+            });
+            setScrapedResults(results);
+            toast({ title: 'Busca Concluída!', description: `${results.length} prospects encontrados.` });
+        } catch (error) {
+            console.error("Error scraping prospects:", error);
+            toast({ title: "Erro na Busca", description: (error as Error).message || "Não foi possível buscar os prospects. Verifique sua chave de API e tente novamente.", variant: "destructive" });
+        } finally {
+            setIsScraping(false);
+        }
+    };
+    
+    const handleSaveAllScraped = async () => {
+        if (scrapedResults.length === 0) return;
+        setIsSaving(true);
+        const promises = scrapedResults.map(prospect => {
+            const newProspect: Omit<Prospect, 'id'> = {
+                name: prospect.name,
+                contact: prospect.phones || prospect.emails || 'N/A', // Prioritize phone, then email
+                stage: 'Contato Inicial',
+                createdAt: serverTimestamp(),
+            };
+            return addDoc(prospectsCollectionRef, newProspect);
+        });
+
+        try {
+            await Promise.all(promises);
+            toast({ title: 'Prospects Salvos!', description: `${scrapedResults.length} novos prospects foram adicionados à sua lista.` });
+            setScrapedResults([]);
+        } catch (error) {
+            console.error("Error bulk saving prospects:", error);
+            toast({ title: "Erro ao Salvar", description: "Ocorreu um erro ao salvar os prospects.", variant: "destructive" });
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
+
     return (
         <div className="space-y-6">
             <div className="flex flex-wrap justify-between items-center gap-4">
-                <h1 className="text-3xl font-bold tracking-tight font-headline">Gerenciar Prospecção</h1>
+                <h1 className="text-3xl font-bold tracking-tight font-headline">Funil de Prospecção</h1>
                 <Button onClick={() => handleOpenDialog(null)}>
                     <PlusCircle className="mr-2 h-4 w-4" />
-                    Adicionar Prospect
+                    Adicionar Prospect Manualmente
                 </Button>
             </div>
 
-            <section>
+            <Card>
+                <CardHeader>
+                    <CardTitle className="font-headline">Prospecção Automática com IA</CardTitle>
+                    <CardDescription>Use o web scraping para encontrar novos leads. Requer uma chave de API da Outscraper no painel da agência.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div className="space-y-2">
+                            <Label htmlFor="query">Nicho / Termo de Busca</Label>
+                            <Input id="query" value={scrapeQuery.query} onChange={e => setScrapeQuery({...scrapeQuery, query: e.target.value})} placeholder="Ex: Restaurantes, Advogados" />
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="location">Localização</Label>
+                            <Input id="location" value={scrapeQuery.location} onChange={e => setScrapeQuery({...scrapeQuery, location: e.target.value})} placeholder="Ex: São Paulo, Brasil" />
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="limit">Quantidade</Label>
+                            <Input id="limit" type="number" value={scrapeQuery.limit} onChange={e => setScrapeQuery({...scrapeQuery, limit: parseInt(e.target.value, 10) || 1})} min="1" max="100"/>
+                        </div>
+                    </div>
+                    <Button onClick={handleScrape} disabled={isScraping}>
+                        {isScraping ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Wand2 className="mr-2 h-4 w-4" />}
+                        {isScraping ? 'Buscando Prospects...' : 'Buscar Prospects com IA'}
+                    </Button>
+                </CardContent>
+            </Card>
+
+            {scrapedResults.length > 0 && (
                 <Card>
+                    <CardHeader className="flex flex-row justify-between items-center">
+                        <div>
+                            <CardTitle>Resultados da Busca</CardTitle>
+                            <CardDescription>Revise os prospects encontrados e salve na sua lista.</CardDescription>
+                        </div>
+                        <Button onClick={handleSaveAllScraped} disabled={isSaving}>
+                          {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <PlusCircle className="mr-2 h-4 w-4" />}
+                          Salvar Todos os Prospects
+                        </Button>
+                    </CardHeader>
+                    <CardContent>
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>Nome</TableHead>
+                                    <TableHead>Telefone(s)</TableHead>
+                                    <TableHead>Email(s)</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {scrapedResults.map((prospect, index) => (
+                                    <TableRow key={index}>
+                                        <TableCell className="font-medium">{prospect.name}</TableCell>
+                                        <TableCell>{prospect.phones || 'N/A'}</TableCell>
+                                        <TableCell>{prospect.emails || 'N/A'}</TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    </CardContent>
+                </Card>
+            )}
+
+            <Card>
+                <CardHeader>
+                    <CardTitle>Lista de Prospects</CardTitle>
+                </CardHeader>
+                <CardContent>
                     {isLoading ? (
                         <div className="flex justify-center items-center h-64">
                             <Loader2 className="h-8 w-8 animate-spin" />
@@ -177,8 +297,8 @@ export default function ProspectsPage() {
                             </TableBody>
                         </Table>
                     )}
-                </Card>
-            </section>
+                </CardContent>
+            </Card>
             
             <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
                 <DialogContent>
@@ -194,12 +314,12 @@ export default function ProspectsPage() {
                             <Input id="name" name="name" defaultValue={currentProspect?.name} required />
                         </div>
                         <div>
-                            <Label htmlFor="contact">Nome do Contato</Label>
+                            <Label htmlFor="contact">Contato (Telefone/Email)</Label>
                             <Input id="contact" name="contact" defaultValue={currentProspect?.contact} required />
                         </div>
                          <div>
                             <Label htmlFor="stage">Etapa do Funil</Label>
-                            <Select name="stage" defaultValue={currentProspect?.stage}>
+                            <Select name="stage" defaultValue={currentProspect?.stage || 'Contato Inicial'}>
                                 <SelectTrigger id="stage">
                                     <SelectValue placeholder="Selecione a etapa" />
                                 </SelectTrigger>
