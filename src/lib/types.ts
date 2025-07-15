@@ -175,6 +175,17 @@ export interface Processo {
   createdAt: Timestamp;
 }
 
+export interface Issue {
+  id: string;
+  title: string;
+  description: string;
+  priority: 'Baixa' | 'Média' | 'Alta';
+  status: 'Aberto' | 'Em Andamento' | 'Resolvido';
+  responsibleId?: string;
+  createdAt: Timestamp;
+  resolvedAt?: Timestamp;
+}
+
 
 // Re-exporting AI types to be used in the UI
 export type { AdsIACreatorInput };

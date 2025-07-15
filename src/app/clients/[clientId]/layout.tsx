@@ -6,7 +6,7 @@ import type { Client } from '@/lib/types';
 import { doc, getDoc } from 'firebase/firestore';
 import Link from 'next/link';
 import { usePathname, useParams } from 'next/navigation';
-import { Bot, FileText, KeyRound, Lightbulb, Megaphone, Share2, Wallet, Folder, CheckSquare } from 'lucide-react';
+import { Bot, FileText, KeyRound, Lightbulb, Megaphone, Share2, Wallet, Folder, CheckSquare, AlertTriangle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useEffect, useState } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -18,6 +18,7 @@ const tabs = [
   { name: 'Brainstorm IA', href: '/brainstorming', icon: Lightbulb },
   { name: 'Processos', href: '/processos', icon: CheckSquare },
   { name: 'Agentes IA', href: '/agents', icon: Bot },
+  { name: 'Issues', href: '/issues', icon: AlertTriangle },
   { name: 'Acessos', href: '/access', icon: KeyRound },
   { name: 'Contexto', href: '', icon: FileText },
 ];
