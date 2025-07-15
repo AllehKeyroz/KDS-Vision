@@ -17,9 +17,10 @@ import type { Proposal, Client } from '@/lib/types';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { format } from 'date-fns';
+import { format, isPast } from 'date-fns';
 import { formatCurrency } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
+import { cn } from '@/lib/utils';
 
 export default function ProposalsPage() {
     const [proposals, setProposals] = useState<Proposal[]>([]);
@@ -40,11 +41,11 @@ export default function ProposalsPage() {
                 return { 
                     id: doc.id, 
                     ...docData,
-                    createdAt: docData.createdAt?.toDate ? format(docData.createdAt.toDate(), 'yyyy-MM-dd') : undefined,
-                    validUntil: docData.validUntil?.toDate ? format(docData.validUntil.toDate(), 'yyyy-MM-dd') : undefined
+                    createdAt: docData.createdAt?.toDate(),
+                    validUntil: docData.validUntil?.toDate()
                 } as Proposal;
             });
-            setProposals(data.sort((a, b) => (b.createdAt && a.createdAt) ? new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime() : 0));
+            setProposals(data.sort((a, b) => (b.createdAt?.getTime() || 0) - (a.createdAt?.getTime() || 0)));
             setIsLoading(false);
         });
         
@@ -74,17 +75,18 @@ export default function ProposalsPage() {
         const formData = new FormData(event.currentTarget);
         
         const clientInfo = (formData.get('clientId') as string).split('|');
-        const proposalData = {
+        const proposalData: Partial<Proposal> = {
             title: formData.get('title') as string,
             clientId: clientInfo[0],
             clientName: clientInfo[1],
             scope: formData.get('scope') as string,
             value: Number(formData.get('value')),
             status: formData.get('status') as Proposal['status'],
+            validityBenefit: formData.get('validityBenefit') as string,
             validUntil: formData.get('validUntil') ? new Date(formData.get('validUntil') as string) : null,
         };
 
-        if (!proposalData.title || !proposalData.clientId || !proposalData.scope || isNaN(proposalData.value)) {
+        if (!proposalData.title || !proposalData.clientId || !proposalData.scope || isNaN(proposalData.value as number)) {
             toast({ title: "Campos obrigatórios", description: "Título, cliente, escopo e valor são obrigatórios.", variant: "destructive" });
             setIsSaving(false);
             return;
@@ -117,11 +119,22 @@ export default function ProposalsPage() {
         }
     };
     
-    const statusBadgeVariant: { [key in Proposal['status']]: string } = {
-        'Rascunho': 'bg-gray-500/20 text-gray-400 border-gray-500/30',
-        'Enviada': 'bg-blue-500/20 text-blue-400 border-blue-500/30',
-        'Aceita': 'bg-green-500/20 text-green-400 border-green-500/30',
-        'Recusada': 'bg-red-500/20 text-red-400 border-red-500/30',
+    const getStatusInfo = (proposal: Proposal): { status: string; className: string } => {
+        const isExpired = proposal.validUntil && isPast(proposal.validUntil);
+        
+        if (isExpired && (proposal.status === 'Rascunho' || proposal.status === 'Enviada')) {
+            return { status: 'Expirada', className: 'bg-orange-500/20 text-orange-400 border-orange-500/30' };
+        }
+        
+        const statusBadgeVariant: { [key in Proposal['status']]: string } = {
+            'Rascunho': 'bg-gray-500/20 text-gray-400 border-gray-500/30',
+            'Enviada': 'bg-blue-500/20 text-blue-400 border-blue-500/30',
+            'Aceita': 'bg-green-500/20 text-green-400 border-green-500/30',
+            'Recusada': 'bg-red-500/20 text-red-400 border-red-500/30',
+            'Expirada': 'bg-orange-500/20 text-orange-400 border-orange-500/30'
+        };
+
+        return { status: proposal.status, className: statusBadgeVariant[proposal.status] };
     };
 
     return (
@@ -158,12 +171,14 @@ export default function ProposalsPage() {
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {proposals.length > 0 ? proposals.map((proposal) => (
+                                {proposals.length > 0 ? proposals.map((proposal) => {
+                                    const { status, className } = getStatusInfo(proposal);
+                                    return (
                                     <TableRow key={proposal.id}>
                                         <TableCell className="font-medium">{proposal.title}</TableCell>
                                         <TableCell className="text-muted-foreground">{proposal.clientName}</TableCell>
                                         <TableCell className="text-muted-foreground">{formatCurrency(proposal.value)}</TableCell>
-                                        <TableCell><Badge className={statusBadgeVariant[proposal.status]}>{proposal.status}</Badge></TableCell>
+                                        <TableCell><Badge className={className}>{status}</Badge></TableCell>
                                         <TableCell className="text-right">
                                             <DropdownMenu>
                                                 <DropdownMenuTrigger asChild>
@@ -194,7 +209,7 @@ export default function ProposalsPage() {
                                             </DropdownMenu>
                                         </TableCell>
                                     </TableRow>
-                                )) : (
+                                )}) : (
                                     <TableRow>
                                         <TableCell colSpan={5} className="h-24 text-center">
                                             Nenhuma proposta cadastrada.
@@ -231,6 +246,10 @@ export default function ProposalsPage() {
                             <Label htmlFor="scope">Escopo Detalhado</Label>
                             <Textarea id="scope" name="scope" rows={5} placeholder="Descreva os entregáveis da proposta..." defaultValue={currentProposal?.scope} required />
                         </div>
+                        <div>
+                            <Label htmlFor="validityBenefit">Benefício por Fechamento Rápido (Opcional)</Label>
+                            <Input id="validityBenefit" name="validityBenefit" placeholder="Ex: Garante o bônus de 10% OFF." defaultValue={currentProposal?.validityBenefit} />
+                        </div>
                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                             <div>
                                 <Label htmlFor="value">Valor (R$)</Label>
@@ -238,7 +257,7 @@ export default function ProposalsPage() {
                             </div>
                              <div>
                                 <Label htmlFor="validUntil">Válida Até</Label>
-                                <Input id="validUntil" name="validUntil" type="date" defaultValue={currentProposal?.validUntil} />
+                                <Input id="validUntil" name="validUntil" type="date" defaultValue={currentProposal?.validUntil ? format(new Date(currentProposal.validUntil), 'yyyy-MM-dd') : ''} />
                             </div>
                              <div>
                                 <Label htmlFor="status">Status</Label>

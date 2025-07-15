@@ -21,9 +21,10 @@ export type Proposal = {
     title: string;
     scope: string;
     value: number;
-    status: 'Rascunho' | 'Enviada' | 'Aceita' | 'Recusada';
-    createdAt?: any;
-    validUntil?: any;
+    status: 'Rascunho' | 'Enviada' | 'Aceita' | 'Recusada' | 'Expirada';
+    createdAt: Date;
+    validUntil: Date | null;
+    validityBenefit?: string;
 };
 
 export type Client = {
