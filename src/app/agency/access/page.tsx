@@ -5,11 +5,11 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
-import { Copy, PlusCircle, Trash2, Save, Loader2, KeyRound, Bot, Map } from 'lucide-react';
+import { Copy, PlusCircle, Trash2, Save, Loader2, KeyRound } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
-import { collection, addDoc, onSnapshot, deleteDoc, doc, setDoc, getDoc } from 'firebase/firestore';
+import { collection, addDoc, onSnapshot, deleteDoc, doc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import type { ClientAccess } from '@/lib/types';
 import {
@@ -25,7 +25,6 @@ import {
 } from "@/components/ui/alert-dialog"
 
 const agencyAccessCollectionRef = collection(db, 'agency', 'internal', 'access');
-const apiKeysCollectionRef = doc(db, 'agency', 'internal', 'api_keys', 'google_maps');
 
 export default function AgencyAccessPage() {
     const { toast } = useToast();
@@ -33,15 +32,14 @@ export default function AgencyAccessPage() {
     const [accessList, setAccessList] = useState<ClientAccess[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isSavingAccess, setIsSavingAccess] = useState(false);
-    const [isSavingApiKey, setIsSavingApiKey] = useState(false);
     const [accessFormData, setAccessFormData] = useState({ platform: '', link: '', login: '', password_plain: '', apiKey: '' });
-    const [googleMapsApiKey, setGoogleMapsApiKey] = useState('');
-
+    
     useEffect(() => {
         setIsLoading(true);
         const unsubscribeAccess = onSnapshot(agencyAccessCollectionRef, (querySnapshot) => {
             const data = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as ClientAccess[];
             setAccessList(data);
+            setIsLoading(false);
         }, (error) => {
             console.error("Error fetching agency access data:", error);
             toast({
@@ -49,17 +47,8 @@ export default function AgencyAccessPage() {
                 description: "Não foi possível buscar os dados de acesso da agência.",
                 variant: "destructive"
             });
+            setIsLoading(false);
         });
-        
-        const fetchApiKey = async () => {
-             const docSnap = await getDoc(apiKeysCollectionRef);
-             if (docSnap.exists()) {
-                 setGoogleMapsApiKey(docSnap.data().key || '');
-             }
-             setIsLoading(false);
-        };
-        
-        fetchApiKey();
 
         return () => {
             unsubscribeAccess();
@@ -116,46 +105,11 @@ export default function AgencyAccessPage() {
         }
     }
 
-    const handleApiKeySubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
-        setIsSavingApiKey(true);
-        try {
-            await setDoc(apiKeysCollectionRef, { key: googleMapsApiKey });
-            toast({ title: "Chave de API Salva!", description: "Sua chave da Google Maps foi salva com sucesso." });
-        } catch (error) {
-            console.error("Error saving API key:", error);
-            toast({ title: "Erro ao salvar chave", variant: "destructive" });
-        } finally {
-            setIsSavingApiKey(false);
-        }
-    }
-
     return (
         <div className="space-y-6">
             <Card>
                 <CardHeader>
-                    <CardTitle className="flex items-center gap-2"><Map />Chaves de API</CardTitle>
-                    <CardDescription>Gerencie as chaves de API para integrações de terceiros, como a Prospecção Automática.</CardDescription>
-                </CardHeader>
-                <CardContent>
-                    <form onSubmit={handleApiKeySubmit} className="space-y-4">
-                         <div className="space-y-1">
-                            <Label htmlFor="googleMapsApiKey">Google Maps API Key</Label>
-                            <div className="flex gap-2">
-                                <Input id="googleMapsApiKey" type="password" placeholder="Cole sua chave de API do Google Cloud aqui" value={googleMapsApiKey} onChange={(e) => setGoogleMapsApiKey(e.target.value)} />
-                                <Button type="submit" variant="secondary" disabled={isSavingApiKey}>
-                                    {isSavingApiKey ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-                                    Salvar Chave
-                                </Button>
-                            </div>
-                        </div>
-                    </form>
-                </CardContent>
-            </Card>
-
-            <Card>
-                <CardHeader>
-                    <CardTitle>Acessos Internos da Agência</CardTitle>
+                    <CardTitle>Adicionar Novo Acesso Interno</CardTitle>
                     <CardDescription>Guarde aqui os acessos a plataformas e ferramentas da própria agência.</CardDescription>
                 </CardHeader>
                 <CardContent className="p-6">
@@ -179,8 +133,8 @@ export default function AgencyAccessPage() {
                             </div>
                         </div>
                         <div className="space-y-1">
-                            <Label htmlFor="apiKey">Chave de API / Outras Infos</Label>
-                            <Input id="apiKey" placeholder="Ex: Chave de API ou observação importante" value={accessFormData.apiKey} onChange={handleAccessChange}/>
+                            <Label htmlFor="apiKey">Observações / Outras Infos</Label>
+                            <Input id="apiKey" placeholder="Ex: Informação importante sobre este acesso" value={accessFormData.apiKey} onChange={handleAccessChange}/>
                         </div>
                         <div className="flex justify-end">
                             <Button type="submit" variant="secondary" className="font-bold tracking-wide" disabled={isSavingAccess}>
@@ -193,6 +147,9 @@ export default function AgencyAccessPage() {
             </Card>
 
             <Card>
+            <CardHeader>
+                <CardTitle>Acessos Salvos</CardTitle>
+            </CardHeader>
             <CardContent className="p-0">
                 <Table>
                     <TableHeader>
@@ -200,7 +157,7 @@ export default function AgencyAccessPage() {
                             <TableHead>Plataforma</TableHead>
                             <TableHead>Login</TableHead>
                             <TableHead>Senha</TableHead>
-                            <TableHead>Chave / Info</TableHead>
+                            <TableHead>Observações</TableHead>
                             <TableHead className="text-right">Ações</TableHead>
                         </TableRow>
                     </TableHeader>
@@ -225,12 +182,7 @@ export default function AgencyAccessPage() {
                                         Copiar Senha
                                     </Button>
                                 </TableCell>
-                                <TableCell>
-                                    <Button variant="ghost" size="sm" onClick={() => handleCopy(access.apiKey, 'Chave API')}>
-                                        <KeyRound className="mr-2 h-3 w-3" />
-                                        Copiar Chave
-                                    </Button>
-                                </TableCell>
+                                <TableCell className="text-muted-foreground">{access.apiKey}</TableCell>
                                 <TableCell className="text-right">
                                     <AlertDialog>
                                       <AlertDialogTrigger asChild>

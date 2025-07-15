@@ -3,11 +3,13 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { KeyRound, Settings } from 'lucide-react';
+import { KeyRound, Settings, Link as LinkIcon, Puzzle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const tabs = [
   { name: 'Acessos Internos', href: '/agency/access', icon: KeyRound },
+  { name: 'Chaves de API', href: '/agency/keys', icon: Puzzle },
+  { name: 'Links Úteis', href: '/agency/links', icon: LinkIcon },
   // Future tabs can be added here
   // { name: 'Configurações', href: '/agency/settings', icon: Settings },
 ];

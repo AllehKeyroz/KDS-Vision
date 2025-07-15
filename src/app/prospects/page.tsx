@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import type { Prospect } from "@/lib/types";
-import { PlusCircle, Loader2, MoreVertical, Edit, Trash2, Wand2, Star } from "lucide-react";
+import { PlusCircle, Loader2, MoreVertical, Edit, Trash2, Wand2, Star, Save } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogTrigger, DialogClose } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -36,7 +36,7 @@ export default function ProspectsPage() {
 
     // State for the scraper
     const [isScraping, setIsScraping] = useState(false);
-    const [scrapeQuery, setScrapeQuery] = useState({ query: '', location: '' });
+    const [scrapeQuery, setScrapeQuery] = useState({ query: '', location: '', limit: 20 });
     const [scrapedResults, setScrapedResults] = useState<ScrapedProspect[]>([]);
 
     const prospectsCollectionRef = useMemo(() => collection(db, 'prospects'), []);
@@ -121,6 +121,7 @@ export default function ProspectsPage() {
         try {
             const results = await runProspectScraper({
                 query: `${scrapeQuery.query} em ${scrapeQuery.location}`,
+                limit: scrapeQuery.limit,
             });
             setScrapedResults(results);
             toast({ title: 'Busca Concluída!', description: `${results.length} prospects encontrados.` });
@@ -138,7 +139,7 @@ export default function ProspectsPage() {
         const promises = scrapedResults.map(prospect => {
             const newProspect: Omit<Prospect, 'id'> = {
                 name: prospect.name,
-                contact: prospect.contact, // Use the generic contact field
+                contact: prospect.contact,
                 stage: 'Contato Inicial',
                 createdAt: serverTimestamp(),
             };
@@ -171,10 +172,10 @@ export default function ProspectsPage() {
             <Card>
                 <CardHeader>
                     <CardTitle className="font-headline">Prospecção Automática com IA</CardTitle>
-                    <CardDescription>Use o Google Places API para encontrar novos leads. Requer uma chave de API do Google Maps no painel da agência.</CardDescription>
+                    <CardDescription>Use a Outscraper API para encontrar novos leads. Requer uma chave de API no painel da agência.</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div className="space-y-2">
                             <Label htmlFor="query">Nicho / Termo de Busca</Label>
                             <Input id="query" value={scrapeQuery.query} onChange={e => setScrapeQuery({...scrapeQuery, query: e.target.value})} placeholder="Ex: Restaurantes, Advogados" />
@@ -183,10 +184,14 @@ export default function ProspectsPage() {
                             <Label htmlFor="location">Localização</Label>
                             <Input id="location" value={scrapeQuery.location} onChange={e => setScrapeQuery({...scrapeQuery, location: e.target.value})} placeholder="Ex: São Paulo, Brasil" />
                         </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="limit">Quantidade</Label>
+                            <Input id="limit" type="number" value={scrapeQuery.limit} onChange={e => setScrapeQuery({...scrapeQuery, limit: parseInt(e.target.value, 10)})} />
+                        </div>
                     </div>
                     <Button onClick={handleScrape} disabled={isScraping}>
                         {isScraping ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Wand2 className="mr-2 h-4 w-4" />}
-                        {isScraping ? 'Buscando Prospects...' : 'Buscar Prospects com Google'}
+                        {isScraping ? 'Buscando Prospects...' : 'Buscar Prospects com Outscraper'}
                     </Button>
                 </CardContent>
             </Card>
@@ -199,7 +204,7 @@ export default function ProspectsPage() {
                             <CardDescription>Revise os prospects encontrados e salve na sua lista.</CardDescription>
                         </div>
                         <Button onClick={handleSaveAllScraped} disabled={isSaving}>
-                          {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <PlusCircle className="mr-2 h-4 w-4" />}
+                          {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
                           Salvar Todos os Prospects
                         </Button>
                     </CardHeader>
