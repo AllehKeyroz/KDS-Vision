@@ -5,7 +5,7 @@ import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Briefcase, Users, ArrowRight, FolderKanban, ListTodo, Filter, CalendarIcon as CalendarIconLucide, User as UserIcon, PlusCircle, CheckCircle2, Loader2, Check, ChevronsUpDown } from 'lucide-react';
+import { Briefcase, Users, ArrowRight, FolderKanban, ListTodo, Filter, CalendarIcon as CalendarIconLucide, User as UserIcon, PlusCircle, CheckCircle2, Loader2, Check, ChevronsUpDown, Trash2 } from 'lucide-react';
 import { db } from '@/lib/firebase';
 import { collection, onSnapshot, query, where, Timestamp, addDoc, doc, updateDoc, deleteDoc } from 'firebase/firestore';
 import type { Client, Prospect, Project, Task, User, Appointment } from '@/lib/types';
@@ -25,14 +25,11 @@ import { useToast } from '@/hooks/use-toast';
 import { ptBR } from 'date-fns/locale';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { Badge } from '@/components/ui/badge';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 
-interface NewAppointmentState {
-  title: string;
-  notes: string;
-  userIds: string[];
-  clientId?: string;
-  time?: Date;
-  duration: number;
+type AppointmentFormData = Omit<Appointment, 'id' | 'date'> & {
+  id?: string;
+  date: Date | undefined;
 }
 
 export default function DashboardPage() {
@@ -49,7 +46,9 @@ export default function DashboardPage() {
   const [filters, setFilters] = useState({ responsible: '', deadline: null as Date | null });
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
   const [isAppointmentDialogOpen, setIsAppointmentDialogOpen] = useState(false);
-  const [newAppointment, setNewAppointment] = useState<NewAppointmentState>({ title: '', notes: '', userIds: [], duration: 30 });
+  
+  const emptyAppointment: AppointmentFormData = { title: '', notes: '', userIds: [], duration: 30, date: undefined, clientId: undefined };
+  const [appointmentFormData, setAppointmentFormData] = useState<AppointmentFormData>(emptyAppointment);
 
   useEffect(() => {
     const unsubscribes: (() => void)[] = [];
@@ -121,16 +120,20 @@ export default function DashboardPage() {
     return () => unsubscribes.forEach(unsub => unsub());
   }, []);
 
-  const handleDateSelect = (date: Date | undefined) => {
-    if (!date) return;
-    setSelectedDate(startOfDay(date));
+  const handleOpenAppointmentDialog = (appointment?: Appointment | null, timeSlot?: Date) => {
+    if (appointment) {
+        setAppointmentFormData({ ...appointment, date: appointment.date });
+    } else {
+        const date = timeSlot || selectedDate;
+        setAppointmentFormData({ ...emptyAppointment, date });
+    }
     setIsAppointmentDialogOpen(true);
   };
   
   const dailyAppointments = useMemo(() => {
     if (!selectedDate) return [];
     const dateStr = format(selectedDate, 'yyyy-MM-dd');
-    return appointments.filter(app => format(app.date, 'yyyy-MM-dd') === dateStr);
+    return appointments.filter(app => format(app.date, 'yyyy-MM-dd') === dateStr).sort((a,b) => a.date.getTime() - b.date.getTime());
   }, [appointments, selectedDate]);
   
   const timeSlots = useMemo(() => {
@@ -152,47 +155,77 @@ export default function DashboardPage() {
     return slots;
   }, [selectedDate, dailyAppointments]);
   
-  const handleAddAppointment = async (e: React.FormEvent) => {
+  const handleSaveAppointment = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newAppointment.title || newAppointment.userIds.length === 0 || !newAppointment.time) {
+    if (!appointmentFormData.title || appointmentFormData.userIds.length === 0 || !appointmentFormData.date) {
         toast({ title: 'Campos obrigatórios', description: 'Título, horário e ao menos um responsável são necessários.', variant: 'destructive' });
         return;
     }
 
-    const slotsNeeded = newAppointment.duration / 30;
-    const startIndex = timeSlots.findIndex(slot => slot.time.getTime() === newAppointment.time?.getTime());
+    const slotsNeeded = appointmentFormData.duration / 30;
+    const startIndex = timeSlots.findIndex(slot => slot.time.getTime() === appointmentFormData.date?.getTime());
     
-    if (startIndex === -1) {
+    if (startIndex === -1 && !appointmentFormData.id) { // Don't check for slot if we are just editing text
         toast({ title: 'Horário inválido', variant: 'destructive' });
         return;
     }
 
-    for (let i = 0; i < slotsNeeded; i++) {
-        if (startIndex + i >= timeSlots.length || timeSlots[startIndex + i].booked) {
-            toast({ title: 'Horário indisponível', description: 'O horário selecionado não tem tempo livre suficiente para a duração do compromisso.', variant: 'destructive' });
-            return;
-        }
+    // Skip time validation if editing an existing event
+    if (!appointmentFormData.id) {
+      for (let i = 0; i < slotsNeeded; i++) {
+          if (startIndex + i >= timeSlots.length || timeSlots[startIndex + i].booked) {
+              toast({ title: 'Horário indisponível', description: 'O horário selecionado não tem tempo livre suficiente para a duração do compromisso.', variant: 'destructive' });
+              return;
+          }
+      }
     }
 
+
     setIsSaving(true);
+
+    const dataToSave = {
+        title: appointmentFormData.title,
+        notes: appointmentFormData.notes,
+        userIds: appointmentFormData.userIds,
+        clientId: appointmentFormData.clientId || null,
+        date: Timestamp.fromDate(appointmentFormData.date),
+        duration: appointmentFormData.duration,
+    };
+
     try {
-        await addDoc(collection(db, 'appointments'), {
-            title: newAppointment.title,
-            notes: newAppointment.notes,
-            userIds: newAppointment.userIds,
-            clientId: newAppointment.clientId || null,
-            date: Timestamp.fromDate(newAppointment.time),
-            duration: newAppointment.duration,
-        });
-        toast({ title: 'Compromisso Adicionado!', description: 'O novo compromisso foi salvo.' });
+        if (appointmentFormData.id) {
+            // Update existing
+            const docRef = doc(db, 'appointments', appointmentFormData.id);
+            await updateDoc(docRef, dataToSave);
+            toast({ title: 'Compromisso Atualizado!', description: 'O compromisso foi salvo.' });
+        } else {
+            // Create new
+            await addDoc(collection(db, 'appointments'), dataToSave);
+            toast({ title: 'Compromisso Adicionado!', description: 'O novo compromisso foi salvo.' });
+        }
         setIsAppointmentDialogOpen(false);
-        setNewAppointment({ title: '', notes: '', userIds: [], duration: 30 });
+        setAppointmentFormData(emptyAppointment);
     } catch (error) {
         toast({ title: 'Erro ao salvar', variant: 'destructive' });
     } finally {
         setIsSaving(false);
     }
   };
+
+  const handleDeleteAppointment = async (appointmentId?: string) => {
+      if (!appointmentId) return;
+      setIsSaving(true);
+      try {
+          await deleteDoc(doc(db, 'appointments', appointmentId));
+          toast({ title: "Compromisso Removido", description: "O compromisso foi removido com sucesso." });
+          setIsAppointmentDialogOpen(false);
+          setAppointmentFormData(emptyAppointment);
+      } catch (error) {
+          toast({ title: "Erro ao remover", variant: "destructive" });
+      } finally {
+          setIsSaving(false);
+      }
+  }
   
   const appointmentDates = useMemo(() => {
       return appointments.map(app => app.date);
@@ -416,13 +449,13 @@ export default function DashboardPage() {
           <Card className="col-span-1 md:col-span-2 lg:col-span-1">
             <CardHeader>
                 <CardTitle>Calendário de Compromissos</CardTitle>
-                 <CardDescription>Clique em uma data para adicionar um evento ou ver os existentes.</CardDescription>
+                 <CardDescription>Clique em uma data ou em um horário livre para adicionar um evento.</CardDescription>
             </CardHeader>
             <CardContent>
                 <Calendar
                     mode="single"
                     selected={selectedDate}
-                    onSelect={handleDateSelect}
+                    onSelect={(date) => setSelectedDate(date)}
                     className="p-0 rounded-md border"
                     locale={ptBR}
                     modifiers={{ scheduled: appointmentDates }}
@@ -435,7 +468,7 @@ export default function DashboardPage() {
                     {dailyAppointments.length > 0 ? (
                         <ScrollArea className="h-40">
                         {dailyAppointments.map(app => (
-                            <div key={app.id} className="text-sm p-2 rounded-md bg-secondary/50 mb-1">
+                            <div key={app.id} onClick={() => handleOpenAppointmentDialog(app)} className="text-sm p-2 rounded-md bg-secondary/50 mb-1 cursor-pointer hover:bg-secondary">
                                 <p className="font-bold">{app.title}</p>
                                 <p className="text-xs text-muted-foreground">Horário: {format(app.date, 'HH:mm')}</p>
                                 {app.userIds && <p className="text-xs text-muted-foreground">Responsáveis: {app.userIds.map(uid => users.find(u => u.id === uid)?.name || '').join(', ')}</p>}
@@ -454,33 +487,33 @@ export default function DashboardPage() {
        <Dialog open={isAppointmentDialogOpen} onOpenChange={(isOpen) => {
             setIsAppointmentDialogOpen(isOpen);
             if (!isOpen) {
-                setNewAppointment({ title: '', notes: '', userIds: [], duration: 30 });
+                setAppointmentFormData(emptyAppointment);
             }
        }}>
         <DialogContent className="sm:max-w-[625px]">
             <DialogHeader>
-                <DialogTitle>Adicionar Compromisso</DialogTitle>
+                <DialogTitle>{appointmentFormData.id ? 'Editar Compromisso' : 'Adicionar Compromisso'}</DialogTitle>
                 <DialogDescription>
-                    Agende um novo compromisso para {selectedDate ? format(selectedDate, 'PPP', {locale: ptBR}) : ''}.
+                   {appointmentFormData.id ? 'Edite os detalhes do compromisso abaixo.' : `Agende um novo compromisso para ${selectedDate ? format(selectedDate, 'PPP', {locale: ptBR}) : ''}.`}
                 </DialogDescription>
             </DialogHeader>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <form onSubmit={handleAddAppointment} className="space-y-4">
+                <form onSubmit={handleSaveAppointment} className="space-y-4">
                     <div>
                         <Label htmlFor="title">Título do Compromisso</Label>
-                        <Input id="title" value={newAppointment.title} onChange={e => setNewAppointment(p => ({...p, title: e.target.value}))} required />
+                        <Input id="title" value={appointmentFormData.title} onChange={e => setAppointmentFormData(p => ({...p, title: e.target.value}))} required />
                     </div>
                     
                     <div className="grid grid-cols-2 gap-4">
                         <div>
                              <Label>Horário de Início</Label>
-                             <Input type="text" readOnly value={newAppointment.time ? format(newAppointment.time, 'HH:mm') : "Selecione um horário"} className="bg-muted"/>
+                             <Input type="text" readOnly value={appointmentFormData.date ? format(appointmentFormData.date, 'HH:mm') : "Selecione um horário"} className="bg-muted"/>
                         </div>
                         <div>
                             <Label htmlFor="duration">Duração (min)</Label>
                             <Select 
-                                value={String(newAppointment.duration)} 
-                                onValueChange={value => setNewAppointment(p => ({...p, duration: Number(value)}))}>
+                                value={String(appointmentFormData.duration)} 
+                                onValueChange={value => setAppointmentFormData(p => ({...p, duration: Number(value)}))}>
                                 <SelectTrigger>
                                     <SelectValue />
                                 </SelectTrigger>
@@ -503,8 +536,8 @@ export default function DashboardPage() {
                                 role="combobox"
                                 className="w-full justify-between"
                             >
-                                {newAppointment.userIds.length > 0
-                                ? `${newAppointment.userIds.length} selecionado(s)`
+                                {appointmentFormData.userIds.length > 0
+                                ? `${appointmentFormData.userIds.length} selecionado(s)`
                                 : "Selecione os membros..."}
                                 <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                             </Button>
@@ -519,7 +552,7 @@ export default function DashboardPage() {
                                     <CommandItem
                                         key={user.id}
                                         onSelect={() => {
-                                        setNewAppointment(p => {
+                                        setAppointmentFormData(p => {
                                             const newIds = p.userIds.includes(user.id)
                                             ? p.userIds.filter(id => id !== user.id)
                                             : [...p.userIds, user.id];
@@ -530,7 +563,7 @@ export default function DashboardPage() {
                                         <Check
                                         className={cn(
                                             "mr-2 h-4 w-4",
-                                            newAppointment.userIds.includes(user.id) ? "opacity-100" : "opacity-0"
+                                            appointmentFormData.userIds.includes(user.id) ? "opacity-100" : "opacity-0"
                                         )}
                                         />
                                         {user.name}
@@ -542,7 +575,7 @@ export default function DashboardPage() {
                             </PopoverContent>
                         </Popover>
                         <div className="pt-2 flex flex-wrap gap-1">
-                            {newAppointment.userIds.map(id => {
+                            {appointmentFormData.userIds.map(id => {
                                 const user = users.find(u => u.id === id);
                                 return user ? <Badge key={id} variant="secondary">{user.name}</Badge> : null;
                             })}
@@ -550,7 +583,7 @@ export default function DashboardPage() {
                     </div>
                      <div>
                         <Label htmlFor="clientId">Cliente (Opcional)</Label>
-                        <Select onValueChange={value => setNewAppointment(p => ({...p, clientId: value}))}>
+                        <Select value={appointmentFormData.clientId} onValueChange={value => setAppointmentFormData(p => ({...p, clientId: value === 'none' ? undefined : value}))}>
                             <SelectTrigger id="clientId">
                                 <SelectValue placeholder="Selecione um cliente" />
                             </SelectTrigger>
@@ -564,14 +597,35 @@ export default function DashboardPage() {
                     </div>
                      <div>
                         <Label htmlFor="notes">Notas (Opcional)</Label>
-                        <Textarea id="notes" value={newAppointment.notes} onChange={e => setNewAppointment(p => ({...p, notes: e.target.value}))} />
+                        <Textarea id="notes" value={appointmentFormData.notes} onChange={e => setAppointmentFormData(p => ({...p, notes: e.target.value}))} />
                     </div>
-                    <DialogFooter>
-                        <DialogClose asChild><Button type="button" variant="outline">Cancelar</Button></DialogClose>
-                        <Button type="submit" disabled={isSaving}>
-                            {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                            Salvar Compromisso
-                        </Button>
+                    <DialogFooter className="justify-between">
+                         {appointmentFormData.id ? (
+                            <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                    <Button type="button" variant="destructive"><Trash2 className="mr-2 h-4 w-4"/> Excluir</Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                    <AlertDialogHeader>
+                                        <AlertDialogTitle>Excluir compromisso?</AlertDialogTitle>
+                                        <AlertDialogDescription>
+                                            Esta ação não pode ser desfeita.
+                                        </AlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                        <AlertDialogAction onClick={() => handleDeleteAppointment(appointmentFormData.id)} className="bg-destructive hover:bg-destructive/90">Excluir</AlertDialogAction>
+                                    </AlertDialogFooter>
+                                </AlertDialogContent>
+                            </AlertDialog>
+                         ) : <div></div>}
+                        <div className="flex gap-2">
+                            <DialogClose asChild><Button type="button" variant="outline">Cancelar</Button></DialogClose>
+                            <Button type="submit" disabled={isSaving}>
+                                {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                                Salvar
+                            </Button>
+                        </div>
                     </DialogFooter>
                 </form>
                 <div className="space-y-2">
@@ -580,13 +634,13 @@ export default function DashboardPage() {
                         <div className="space-y-1">
                             {timeSlots.map(slot => (
                                 <button key={slot.time.toISOString()} 
-                                    onClick={() => !slot.booked && setNewAppointment(p => ({...p, time: slot.time}))}
+                                    onClick={() => !slot.booked && setAppointmentFormData(p => ({...p, date: slot.time}))}
                                     disabled={slot.booked}
                                     className={cn(
                                         "w-full p-2 rounded-md text-xs flex justify-between items-center",
                                         "transition-colors",
                                         slot.booked ? "bg-red-900/50 text-muted-foreground cursor-not-allowed" : "bg-secondary hover:bg-accent",
-                                        newAppointment.time?.getTime() === slot.time.getTime() && !slot.booked && "ring-2 ring-primary bg-primary/20"
+                                        appointmentFormData.date?.getTime() === slot.time.getTime() && !slot.booked && "ring-2 ring-primary bg-primary/20"
                                 )}>
                                     <span>{format(slot.time, 'HH:mm')} - {format(addMinutes(slot.time, 30), 'HH:mm')}</span>
                                     <Badge variant={slot.booked ? "destructive" : "default"}>{slot.booked ? "Ocupado" : "Livre"}</Badge>
@@ -601,3 +655,5 @@ export default function DashboardPage() {
     </div>
   );
 }
+
+    
