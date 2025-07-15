@@ -15,7 +15,7 @@ const tabs = [
   { name: 'Contexto', href: '', icon: FileText },
   { name: 'Projetos', href: '/projects', icon: Folder },
   { name: 'Ferramentas IA', href: '/tools', icon: Wand2 },
-  { name: 'Processos', href: '/processos', icon: CheckSquare },
+  { name: 'Playbooks', href: '/playbooks', icon: CheckSquare },
   { name: 'Issues', href: '/issues', icon: AlertTriangle },
   { name: 'Acessos', href: '/access', icon: KeyRound },
 ];

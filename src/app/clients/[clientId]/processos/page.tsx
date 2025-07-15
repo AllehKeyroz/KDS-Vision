@@ -105,18 +105,18 @@ export default function ClientProcessosPage() {
     return (
         <div className="space-y-6">
             <div className="flex justify-between items-center">
-                <h1 className="text-2xl font-bold font-headline">Processos do Cliente</h1>
+                <h1 className="text-2xl font-bold font-headline">Playbooks do Cliente</h1>
                  <Popover open={isPopoverOpen} onOpenChange={setIsPopoverOpen}>
                     <PopoverTrigger asChild>
                         <Button>
                             <PlusCircle className="mr-2 h-4 w-4" />
-                            Adicionar Processo
+                            Adicionar Playbook
                         </Button>
                     </PopoverTrigger>
                     <PopoverContent className="w-80">
                         <div className="grid gap-4">
                             <div className="space-y-2">
-                                <h4 className="font-medium leading-none">Adicionar Processo</h4>
+                                <h4 className="font-medium leading-none">Adicionar Playbook</h4>
                                 <p className="text-sm text-muted-foreground">
                                     Selecione um template para adicionar ao cliente.
                                 </p>
@@ -145,8 +145,8 @@ export default function ClientProcessosPage() {
              processos.length === 0 ? (
                 <Card className="text-center py-12">
                     <CardHeader>
-                        <CardTitle>Nenhum processo adicionado</CardTitle>
-                        <CardDescription>Adicione o primeiro processo para este cliente.</CardDescription>
+                        <CardTitle>Nenhum playbook adicionado</CardTitle>
+                        <CardDescription>Adicione o primeiro playbook para este cliente.</CardDescription>
                     </CardHeader>
                 </Card>
              ) : (
@@ -173,8 +173,8 @@ export default function ClientProcessosPage() {
                                                 </Button>
                                             </AlertDialogTrigger>
                                             <AlertDialogContent>
-                                                <AlertDialogHeader><AlertDialogTitle>Excluir Processo?</AlertDialogTitle></AlertDialogHeader>
-                                                <AlertDialogDescription>O progresso deste processo para o cliente será perdido.</AlertDialogDescription>
+                                                <AlertDialogHeader><AlertDialogTitle>Excluir Playbook?</AlertDialogTitle></AlertDialogHeader>
+                                                <AlertDialogDescription>O progresso deste playbook para o cliente será perdido.</AlertDialogDescription>
                                                 <AlertDialogFooter>
                                                     <AlertDialogCancel>Cancelar</AlertDialogCancel>
                                                     <AlertDialogAction onClick={() => handleDeleteProcesso(processo.id)} className="bg-destructive hover:bg-destructive/90">Excluir</AlertDialogAction>

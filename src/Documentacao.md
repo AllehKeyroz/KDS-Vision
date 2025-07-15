@@ -7,7 +7,7 @@ Este documento serve como um raio-x do estado atual do projeto, detalhando as fu
 
 | ID    | Módulo                       | Status      | Funcionalidade                                                                                                         |
 | :---- | :--------------------------- | :---------- | :--------------------------------------------------------------------------------------------------------------------- |
-| **1.1** | Estratégia e Planejamento      |  পেন্ডিং | Diagnóstico de Marketing 360°                                                                                          |
+| **1.1** | Estratégia e Planejamento      |  **Concluído** | Diagnóstico de Marketing 360°                                                                                          |
 | **1.2** | Estratégia e Planejamento      | **Concluído** | Construtor de Persona e ICP - Base (Contexto do Cliente)                                                              |
 | **1.3** | Estratégia e Planejamento      | পেন্ডিং | Mapa de Jornada do Cliente                                                                                             |
 | **1.4** | Estratégia e Planejamento      | পেন্ডিং | Planejador Estratégico Anual/Trimestral                                                                                |
@@ -61,8 +61,8 @@ Este documento serve como um raio-x do estado atual do projeto, detalhando as fu
   - **Brainstorming com IA (`.../brainstorming/page.tsx`):** Gera ideias e tarefas acionáveis com base em um objetivo.
   - **Agentes de IA (`.../agents/page.tsx`):** Permite a criação de agentes com prompts personalizados para o cliente.
 
-- **Processos do Cliente (`.../processos/page.tsx`):**
-  - **Descrição:** Permite aplicar "Templates de Processo" (checklists) a um cliente. Cada item do checklist pode ser marcado como concluído, e o progresso geral é exibido.
+- **(ID 1.1) Playbooks do Cliente (`.../playbooks/page.tsx`):**
+  - **Descrição:** Permite aplicar "Templates de Processo" (checklists/playbooks) a um cliente. Cada item do checklist pode ser marcado como concluído, e o progresso geral é exibido. Serve como base para o Diagnóstico de Marketing 360.
   - **Componentes:** `Accordion` para uma visualização compacta, `Checkbox`, `Progress`.
 
 - **Central de Issues (`.../issues/page.tsx`):**
@@ -88,7 +88,6 @@ Este documento serve como um raio-x do estado atual do projeto, detalhando as fu
 ### 🔲 Funcionalidades Pendentes (Próximos Passos)
 
 1.  **Módulo 1: Estratégia e Planejamento (O Cérebro da Agência)**
-    - `1.1. Diagnóstico de Marketing 360°:` Criar um formulário guiado (wizard) para analisar os 4Ps do marketing do cliente. O resultado deve ser um score e um relatório inicial.
     - `1.3. Mapa de Jornada do Cliente:` Desenvolver uma ferramenta visual (possivelmente usando uma biblioteca de diagramas) para mapear os pontos de contato do cliente.
     - `1.4. Planejador Estratégico:` Criar uma nova seção para definir OKRs (Objetivos e Resultados-Chave) e alocar orçamentos para períodos específicos (trimestre/ano).
 
