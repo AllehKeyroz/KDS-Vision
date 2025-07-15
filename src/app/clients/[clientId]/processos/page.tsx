@@ -3,17 +3,18 @@
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useParams } from 'next/navigation';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Progress } from '@/components/ui/progress';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { PlusCircle, Loader2, Trash2, CheckSquare } from 'lucide-react';
+import { PlusCircle, Loader2, Trash2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { db } from '@/lib/firebase';
 import { collection, onSnapshot, doc, updateDoc, addDoc, serverTimestamp, deleteDoc } from 'firebase/firestore';
 import type { Processo, ProcessoTemplate } from '@/lib/types';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Label } from '@/components/ui/label';
 
 export default function ClientProcessosPage() {
@@ -35,7 +36,7 @@ export default function ClientProcessosPage() {
     useEffect(() => {
         const unsubscribeProcessos = onSnapshot(processosCollectionRef, (snapshot) => {
             const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Processo));
-            setProcessos(data);
+            setProcessos(data.sort((a, b) => (a.createdAt?.toMillis() || 0) - (b.createdAt?.toMillis() || 0)));
             setIsLoading(false);
         });
 
@@ -140,7 +141,7 @@ export default function ClientProcessosPage() {
                 </Popover>
             </div>
 
-            {isLoading ? <Loader2 className="animate-spin" /> :
+             {isLoading ? <div className="flex justify-center py-10"><Loader2 className="animate-spin h-8 w-8" /></div> :
              processos.length === 0 ? (
                 <Card className="text-center py-12">
                     <CardHeader>
@@ -149,53 +150,60 @@ export default function ClientProcessosPage() {
                     </CardHeader>
                 </Card>
              ) : (
-                <div className="space-y-4">
-                    {processos.map(processo => (
-                        <Card key={processo.id}>
-                            <CardHeader className="flex flex-row justify-between items-start">
-                                <div>
-                                    <CardTitle>{processo.title}</CardTitle>
-                                    <CardDescription>
-                                        Saúde do Processo: {calculateProgress(processo)}%
-                                    </CardDescription>
-                                </div>
-                                <AlertDialog>
-                                    <AlertDialogTrigger asChild>
-                                        <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive">
-                                            <Trash2 className="h-4 w-4" />
-                                        </Button>
-                                    </AlertDialogTrigger>
-                                    <AlertDialogContent>
-                                        <AlertDialogHeader><AlertDialogTitle>Excluir Processo?</AlertDialogTitle></AlertDialogHeader>
-                                        <AlertDialogDescription>O progresso deste processo para o cliente será perdido.</AlertDialogDescription>
-                                        <AlertDialogFooter>
-                                            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                            <AlertDialogAction onClick={() => handleDeleteProcesso(processo.id)} className="bg-destructive hover:bg-destructive/90">Excluir</AlertDialogAction>
-                                        </AlertDialogFooter>
-                                    </AlertDialogContent>
-                                </AlertDialog>
-                            </CardHeader>
-                            <CardContent>
-                                <Progress value={calculateProgress(processo)} className="mb-4" />
-                                <div className="space-y-2">
-                                    {processo.items.map((item, index) => (
-                                        <div key={index} className="flex items-center space-x-2">
-                                            <Checkbox 
-                                                id={`${processo.id}-${index}`} 
-                                                checked={item.completed}
-                                                onCheckedChange={(checked) => handleToggleItem(processo.id, index, !!checked)}
-                                            />
-                                            <Label htmlFor={`${processo.id}-${index}`} className={`text-sm ${item.completed ? 'line-through text-muted-foreground' : ''}`}>
-                                                {item.text}
-                                            </Label>
+                <Accordion type="multiple" className="w-full space-y-4">
+                    {processos.map(processo => {
+                        const progress = calculateProgress(processo);
+                        return (
+                             <AccordionItem value={processo.id} key={processo.id} className="border-b-0">
+                                <Card>
+                                    <div className="flex justify-between items-center w-full p-4">
+                                        <AccordionTrigger className="flex-1 py-0 text-left">
+                                           <div className="flex flex-col gap-2">
+                                                <h3 className="font-semibold text-lg">{processo.title}</h3>
+                                                <div className="flex items-center gap-2">
+                                                    <Progress value={progress} className="w-32 h-2" />
+                                                    <span className="text-xs text-muted-foreground">{progress}%</span>
+                                                </div>
+                                           </div>
+                                        </AccordionTrigger>
+                                        <AlertDialog>
+                                            <AlertDialogTrigger asChild>
+                                                <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:bg-destructive/10" onClick={(e) => e.stopPropagation()}>
+                                                    <Trash2 className="h-4 w-4" />
+                                                </Button>
+                                            </AlertDialogTrigger>
+                                            <AlertDialogContent>
+                                                <AlertDialogHeader><AlertDialogTitle>Excluir Processo?</AlertDialogTitle></AlertDialogHeader>
+                                                <AlertDialogDescription>O progresso deste processo para o cliente será perdido.</AlertDialogDescription>
+                                                <AlertDialogFooter>
+                                                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                                    <AlertDialogAction onClick={() => handleDeleteProcesso(processo.id)} className="bg-destructive hover:bg-destructive/90">Excluir</AlertDialogAction>
+                                                </AlertDialogFooter>
+                                            </AlertDialogContent>
+                                        </AlertDialog>
+                                    </div>
+                                    <AccordionContent className="px-6 pb-6">
+                                        <div className="space-y-3">
+                                            {processo.items.map((item, index) => (
+                                                <div key={index} className="flex items-center space-x-3">
+                                                    <Checkbox 
+                                                        id={`${processo.id}-${index}`} 
+                                                        checked={item.completed}
+                                                        onCheckedChange={(checked) => handleToggleItem(processo.id, index, !!checked)}
+                                                    />
+                                                    <Label htmlFor={`${processo.id}-${index}`} className={`text-sm font-normal ${item.completed ? 'line-through text-muted-foreground' : ''}`}>
+                                                        {item.text}
+                                                    </Label>
+                                                </div>
+                                            ))}
                                         </div>
-                                    ))}
-                                </div>
-                            </CardContent>
-                        </Card>
-                    ))}
-                </div>
-            )}
+                                    </AccordionContent>
+                                </Card>
+                            </AccordionItem>
+                        )
+                    })}
+                </Accordion>
+             )}
         </div>
     );
 }
