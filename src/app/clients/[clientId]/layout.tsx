@@ -13,10 +13,10 @@ import { Skeleton } from '@/components/ui/skeleton';
 
 const tabs = [
   { name: 'Projetos', href: '/projects', icon: Folder },
-  { name: 'Playbooks', href: '/playbooks', icon: CheckSquare },
   { name: 'Ads Creator', href: '/ads', icon: Megaphone },
   { name: 'Social', href: '/social', icon: Share2 },
   { name: 'Brainstorm IA', href: '/brainstorming', icon: Lightbulb },
+  { name: 'Processos', href: '/processos', icon: CheckSquare },
   { name: 'Agentes IA', href: '/agents', icon: Bot },
   { name: 'Acessos', href: '/access', icon: KeyRound },
   { name: 'Contexto', href: '', icon: FileText },

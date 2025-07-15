@@ -10,7 +10,7 @@ const tabs = [
   { name: 'Acessos Internos', href: '/agency/access', icon: KeyRound },
   { name: 'Chaves de API', href: '/agency/keys', icon: Puzzle },
   { name: 'Links Úteis', href: '/agency/links', icon: LinkIcon },
-  { name: 'Playbooks', href: '/agency/playbooks', icon: CheckSquare },
+  { name: 'Processos', href: '/agency/processos', icon: CheckSquare },
   // Future tabs can be added here
   // { name: 'Configurações', href: '/agency/settings', icon: Settings },
 ];

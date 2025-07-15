@@ -156,22 +156,22 @@ export interface Appointment {
   notes?: string;
 }
 
-export interface PlaybookItem {
+export interface ProcessoItem {
   text: string;
   completed: boolean;
 }
 
-export interface PlaybookTemplate {
+export interface ProcessoTemplate {
   id: string;
   title: string;
-  items: Omit<PlaybookItem, 'completed'>[];
+  items: Omit<ProcessoItem, 'completed'>[];
 }
 
-export interface Playbook {
+export interface Processo {
   id: string;
   templateId: string;
   title: string;
-  items: PlaybookItem[];
+  items: ProcessoItem[];
   createdAt: Timestamp;
 }
 
