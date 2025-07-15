@@ -147,26 +147,26 @@ export default function ProcessosPage() {
                         <Accordion type="multiple" className="w-full">
                             {templates.map(template => (
                                 <AccordionItem value={template.id} key={template.id}>
-                                    <AccordionTrigger>
-                                        <div className="flex justify-between items-center w-full pr-4">
+                                    <div className="flex justify-between items-center w-full pr-4 py-2">
+                                        <AccordionTrigger className="flex-1 py-0">
                                             <span className="font-semibold text-lg">{template.title}</span>
-                                             <AlertDialog>
-                                                <AlertDialogTrigger asChild>
-                                                    <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:bg-destructive/10" onClick={(e) => e.stopPropagation()}>
-                                                        <Trash2 className="h-4 w-4" />
-                                                    </Button>
-                                                </AlertDialogTrigger>
-                                                <AlertDialogContent>
-                                                    <AlertDialogHeader><AlertDialogTitle>Excluir Template?</AlertDialogTitle></AlertDialogHeader>
-                                                    <AlertDialogDescription>Esta ação não pode ser desfeita e removerá o template para sempre.</AlertDialogDescription>
-                                                    <AlertDialogFooter>
-                                                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                                        <AlertDialogAction onClick={() => handleDeleteTemplate(template.id)} className="bg-destructive hover:bg-destructive/90">Excluir</AlertDialogAction>
-                                                    </AlertDialogFooter>
-                                                </AlertDialogContent>
-                                            </AlertDialog>
-                                        </div>
-                                    </AccordionTrigger>
+                                        </AccordionTrigger>
+                                        <AlertDialog>
+                                            <AlertDialogTrigger asChild>
+                                                <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:bg-destructive/10" onClick={(e) => e.stopPropagation()}>
+                                                    <Trash2 className="h-4 w-4" />
+                                                </Button>
+                                            </AlertDialogTrigger>
+                                            <AlertDialogContent>
+                                                <AlertDialogHeader><AlertDialogTitle>Excluir Template?</AlertDialogTitle></AlertDialogHeader>
+                                                <AlertDialogDescription>Esta ação não pode ser desfeita e removerá o template para sempre.</AlertDialogDescription>
+                                                <AlertDialogFooter>
+                                                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                                    <AlertDialogAction onClick={() => handleDeleteTemplate(template.id)} className="bg-destructive hover:bg-destructive/90">Excluir</AlertDialogAction>
+                                                </AlertDialogFooter>
+                                            </AlertDialogContent>
+                                        </AlertDialog>
+                                    </div>
                                     <AccordionContent>
                                         <ul className="list-disc list-inside pl-4 space-y-1 text-muted-foreground">
                                             {template.items.map((item, index) => (
