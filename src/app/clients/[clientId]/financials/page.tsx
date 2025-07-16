@@ -9,8 +9,9 @@ import { db } from '@/lib/firebase';
 import type { Project, User } from '@/lib/types';
 import { formatCurrency, cn } from '@/lib/utils';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { DollarSign } from 'lucide-react';
+import { DollarSign, Eye, EyeOff } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Button } from '@/components/ui/button';
 
 type ClientAnalysis = {
     totalInvestido: number;
@@ -28,6 +29,7 @@ export default function ClientFinancialsPage() {
     const [projects, setProjects] = useState<Project[]>([]);
     const [users, setUsers] = useState<User[]>([]);
     const [analysis, setAnalysis] = useState<ClientAnalysis | null>(null);
+    const [isValuesVisible, setIsValuesVisible] = useState(false);
 
     useEffect(() => {
         if (!clientId) return;
@@ -106,30 +108,35 @@ export default function ClientFinancialsPage() {
         <div className="space-y-6">
             {analysis && (
                 <Card>
-                    <CardHeader>
-                        <CardTitle className="font-headline flex items-center gap-2"><DollarSign /> Análise Financeira do Cliente</CardTitle>
-                         <CardDescription>Esta análise consolida os dados de todos os projetos para este cliente.</CardDescription>
+                    <CardHeader className="flex flex-row items-start justify-between">
+                        <div>
+                            <CardTitle className="font-headline flex items-center gap-2"><DollarSign /> Análise Financeira do Cliente</CardTitle>
+                            <CardDescription>Esta análise consolida os dados de todos os projetos para este cliente.</CardDescription>
+                        </div>
+                        <Button variant="ghost" size="icon" onClick={() => setIsValuesVisible(!isValuesVisible)}>
+                            {isValuesVisible ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                        </Button>
                     </CardHeader>
                     <CardContent className="space-y-6">
                         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 text-center">
                             <div className="p-4 bg-secondary/50 rounded-lg">
                                 <p className="text-sm text-muted-foreground">Investimento Total</p>
-                                <p className="text-2xl font-bold text-primary">{formatCurrency(analysis.totalInvestido)}</p>
+                                <p className="text-2xl font-bold text-primary">{isValuesVisible ? formatCurrency(analysis.totalInvestido) : 'R$ ******'}</p>
                             </div>
                             <div className="p-4 bg-secondary/50 rounded-lg">
                                 <p className="text-sm text-muted-foreground">Custo Real Total</p>
-                                <p className="text-2xl font-bold text-destructive">{formatCurrency(analysis.totalCustoReal)}</p>
+                                <p className="text-2xl font-bold text-destructive">{isValuesVisible ? formatCurrency(analysis.totalCustoReal) : 'R$ ******'}</p>
                             </div>
                             <div className="p-4 bg-secondary/50 rounded-lg">
                                 <p className="text-sm text-muted-foreground">Lucro Total</p>
                                 <p className={cn("text-2xl font-bold", analysis.totalLucro >= 0 ? "text-green-500" : "text-red-500")}>
-                                    {formatCurrency(analysis.totalLucro)}
+                                    {isValuesVisible ? formatCurrency(analysis.totalLucro) : 'R$ ******'}
                                 </p>
                             </div>
                              <div className="p-4 bg-secondary/50 rounded-lg">
                                 <p className="text-sm text-muted-foreground">ROI</p>
                                 <p className={cn("text-2xl font-bold", analysis.roi >= 0 ? "text-green-500" : "text-red-500")}>
-                                    {analysis.roi === Infinity ? "∞" : `${analysis.roi.toFixed(2)}%`}
+                                    {isValuesVisible ? (analysis.roi === Infinity ? "∞" : `${analysis.roi.toFixed(2)}%`) : '****** %'}
                                 </p>
                             </div>
                         </div>
@@ -141,11 +148,11 @@ export default function ClientFinancialsPage() {
                                         <BarChart data={analysis.projectsData} margin={{ top: 5, right: 20, left: 20, bottom: 5 }}>
                                             <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border) / 0.5)" />
                                             <XAxis dataKey="name" stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} />
-                                            <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(value) => formatCurrency(value, 'compact')}/>
+                                            <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(value) => isValuesVisible ? formatCurrency(value, 'compact') : '***'}/>
                                             <Tooltip
                                                 cursor={{ fill: 'hsl(var(--accent))' }}
                                                 contentStyle={{ backgroundColor: 'hsl(var(--background))', borderColor: 'hsl(var(--border))' }}
-                                                formatter={(value: number) => formatCurrency(value)}
+                                                formatter={(value: number) => isValuesVisible ? formatCurrency(value) : 'R$ ******'}
                                             />
                                             <Legend />
                                             <Bar dataKey="value" name="Valor Faturado" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />

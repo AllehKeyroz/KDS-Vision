@@ -83,8 +83,11 @@ export interface LoggedTime {
 export interface Task {
   id: string;
   text: string;
+  parentId?: string; // ID of the parent task, if this is a sub-task
+  description?: string;
   responsibleIds: string[];
   completed: boolean;
+  priority: 'Baixa' | 'Média' | 'Alta';
   deadline?: any; // Firestore Timestamp
   timeLogs?: LoggedTime[]; // Detailed time tracking
 }
@@ -213,30 +216,28 @@ export interface Issue {
 
 // --- Evolution API Types ---
 export interface EvolutionInstance {
-    id: string;
-    name: string;
-    connectionStatus: 'open' | 'close' | 'connecting' | 'connected' | 'disconnected' | 'qrcode' | 'awaiting_qrcode_scan';
+  id: string;
+  name: string;
+  connectionStatus: 'open' | 'close' | 'connecting' | 'connected' | 'disconnected' | 'qrcode' | 'awaiting_qrcode_scan';
 }
 
 export interface EvolutionInstanceCreationResponse {
-    instance: {
-      instanceName: string;
-      hash: string;
-      status: string;
-    };
-    hash: {
-        apikey: string;
-    };
-    qrcode?: {
-        base64: string;
-    };
+  instance: {
+    instanceName: string;
+  };
+  hash: {
+    apikey: string;
+  };
+  qrcode?: {
+    base64: string;
+  };
 }
 
 export interface GetQRCodeResponse {
-    qrcode: {
-        base64: string;
-    };
-    // other properties may exist
+  qrcode?: {
+    base64?: string;
+  };
+  // other properties may exist
 }
 
 export interface Chat {

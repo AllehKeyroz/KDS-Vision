@@ -5,11 +5,10 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Briefcase, Users, ArrowRight, FolderKanban, ListTodo, Filter, CalendarIcon as CalendarIconLucide, User as UserIcon, PlusCircle, CheckCircle2, Loader2, Check, ChevronsUpDown, Trash2, DollarSign, RefreshCcw, ShoppingCart, ArrowUpCircle, ArrowDownCircle } from 'lucide-react';
+import { Briefcase, Users, ArrowRight, FolderKanban, ListTodo, Filter, CalendarIcon as CalendarIconLucide, User as UserIcon, PlusCircle, CheckCircle2, Loader2, Check, ChevronsUpDown, Trash2, DollarSign, RefreshCcw, ShoppingCart, ArrowUpCircle, ArrowDownCircle, FolderOpen, UserRound } from 'lucide-react';
 import { db } from '@/lib/firebase';
-import { collection, onSnapshot, query, where, Timestamp, addDoc, doc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { collection, onSnapshot, query, where, Timestamp, addDoc, doc, updateDoc, deleteDoc, getDocs } from 'firebase/firestore';
 import type { Client, Prospect, Project, Task, User, Appointment, FinancialTransaction, Contract, RecurringExpense } from '@/lib/types';
-import { Progress } from '@/components/ui/progress';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -47,7 +46,12 @@ export default function DashboardPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   
-  const [filters, setFilters] = useState({ responsibleId: '', deadline: null as { from?: Date; to?: Date } | null });
+  const [filters, setFilters] = useState({ 
+    responsibleId: '', 
+    deadline: null as { from?: Date; to?: Date } | null,
+    clientId: '',
+    projectId: ''
+  });
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
   const [isAppointmentDialogOpen, setIsAppointmentDialogOpen] = useState(false);
   
@@ -115,10 +119,12 @@ export default function DashboardPage() {
 
     // Fetch all projects from all clients
     const unsubscribeProjects = onSnapshot(query(collection(db, 'clients')), (clientsSnapshot) => {
-        const projectPromises = clientsSnapshot.docs.map(clientDoc => {
+        const projectPromises: Promise<(Project & { clientId: string })[]>[] = [];
+        
+        clientsSnapshot.forEach(clientDoc => {
             const projectsColRef = collection(db, 'clients', clientDoc.id, 'projects');
-            return new Promise< (Project & { clientId: string })[] >(resolve => {
-                onSnapshot(projectsColRef, (projectsSnapshot) => {
+            const promise = new Promise<(Project & { clientId: string })[]>(resolve => {
+                getDocs(projectsColRef).then(projectsSnapshot => {
                     const clientProjects = projectsSnapshot.docs.map(projectDoc => ({
                         id: projectDoc.id,
                         clientId: clientDoc.id,
@@ -127,14 +133,15 @@ export default function DashboardPage() {
                     resolve(clientProjects);
                 });
             });
+            projectPromises.push(promise);
         });
-
+    
         Promise.all(projectPromises).then(results => {
             const allProjects = results.flat();
             setProjects(allProjects);
-
-            const tasks = allProjects.flatMap(p => 
-                (p.sections || []).flatMap(s => 
+    
+            const tasks = allProjects.flatMap(p =>
+                (p.sections || []).flatMap(s =>
                     (s.tasks || []).map(t => ({
                         ...t,
                         projectName: p.name,
@@ -148,6 +155,7 @@ export default function DashboardPage() {
         });
     });
     unsubscribes.push(unsubscribeProjects);
+
 
     return () => unsubscribes.forEach(unsub => unsub());
   }, []);
@@ -267,6 +275,12 @@ export default function DashboardPage() {
     if (filters.responsibleId) {
         tasks = tasks.filter(t => (t.responsibleIds || []).includes(filters.responsibleId));
     }
+    if (filters.clientId) {
+        tasks = tasks.filter(t => t.clientId === filters.clientId);
+    }
+    if (filters.projectId) {
+        tasks = tasks.filter(t => t.projectId === filters.projectId);
+    }
     if (filters.deadline?.from) {
       const fromDate = startOfDay(filters.deadline.from);
       tasks = tasks.filter(t => t.deadline && t.deadline.toDate() >= fromDate);
@@ -286,6 +300,11 @@ export default function DashboardPage() {
     });
   }, [allTasks, filters]);
   
+  const projectsForSelectedClient = useMemo(() => {
+      if (!filters.clientId) return [];
+      return projects.filter(p => p.clientId === filters.clientId);
+  }, [projects, filters.clientId]);
+
   const { totalBalance, mrr, crr } = useMemo(() => {
     const balance = financials.reduce((acc, t) => t.type === 'income' ? acc + t.amount : acc - t.amount, 0);
     const monthlyRecurringRevenue = contracts.reduce((acc, c) => c.status === 'active' ? acc + c.amount : acc, 0);
@@ -467,16 +486,30 @@ export default function DashboardPage() {
                               <div className="grid gap-4">
                                   <div className="space-y-2"><h4 className="font-medium leading-none">Filtros de Tarefas</h4><p className="text-sm text-muted-foreground">Filtre as tarefas por responsável ou prazo.</p></div>
                                   <div className="grid gap-2">
-                                       <div className="grid grid-cols-3 items-center gap-4"><Label htmlFor="responsible">Responsável</Label>
+                                       <div className="space-y-1"><Label htmlFor="responsible">Responsável</Label>
                                             <Select onValueChange={(value) => setFilters(f => ({...f, responsibleId: value === 'all' ? '' : value}))} defaultValue={filters.responsibleId}>
-                                                <SelectTrigger id="responsible" className="col-span-2 h-8"><SelectValue placeholder="Selecione" /></SelectTrigger>
+                                                <SelectTrigger id="responsible" className="h-8"><SelectValue placeholder="Selecione" /></SelectTrigger>
                                                 <SelectContent><SelectItem value="all">Todos</SelectItem>{users.map(user => (<SelectItem key={user.id} value={user.id}>{user.name}</SelectItem>))}</SelectContent>
                                             </Select>
                                        </div>
-                                       <div className="grid grid-cols-3 items-center gap-4"><Label htmlFor="deadline">Prazo</Label>
+                                       <div className="space-y-1"><Label htmlFor="client">Cliente</Label>
+                                            <Select onValueChange={(value) => setFilters(f => ({...f, clientId: value === 'all' ? '' : value, projectId: ''}))} defaultValue={filters.clientId}>
+                                                <SelectTrigger id="client" className="h-8"><SelectValue placeholder="Selecione" /></SelectTrigger>
+                                                <SelectContent><SelectItem value="all">Todos</SelectItem>{clients.map(client => (<SelectItem key={client.id} value={client.id}>{client.name}</SelectItem>))}</SelectContent>
+                                            </Select>
+                                       </div>
+                                       {filters.clientId && projectsForSelectedClient.length > 0 && (
+                                        <div className="space-y-1"><Label htmlFor="project">Projeto</Label>
+                                            <Select onValueChange={(value) => setFilters(f => ({...f, projectId: value === 'all' ? '' : value}))} defaultValue={filters.projectId}>
+                                                <SelectTrigger id="project" className="h-8"><SelectValue placeholder="Selecione" /></SelectTrigger>
+                                                <SelectContent><SelectItem value="all">Todos</SelectItem>{projectsForSelectedClient.map(project => (<SelectItem key={project.id} value={project.id}>{project.name}</SelectItem>))}</SelectContent>
+                                            </Select>
+                                       </div>
+                                       )}
+                                       <div className="space-y-1"><Label htmlFor="deadline">Prazo</Label>
                                             <Popover>
                                                 <PopoverTrigger asChild>
-                                                    <Button id="deadline" variant={"outline"} className={cn("col-span-2 h-8 justify-start text-left font-normal", !filters.deadline && "text-muted-foreground")}>
+                                                    <Button id="deadline" variant={"outline"} className={cn("h-8 w-full justify-start text-left font-normal", !filters.deadline && "text-muted-foreground")}>
                                                         <CalendarIconLucide className="mr-2 h-4 w-4" />
                                                          {filters.deadline?.from ? (filters.deadline.to ? <>{format(filters.deadline.from, "LLL dd, y")} - {format(filters.deadline.to, "LLL dd, y")}</> : format(filters.deadline.from, "LLL dd, y")) : <span>Escolha um período</span>}
                                                     </Button>
@@ -485,7 +518,7 @@ export default function DashboardPage() {
                                             </Popover>
                                        </div>
                                   </div>
-                                   <Button variant="ghost" onClick={() => setFilters({ responsibleId: '', deadline: null })}>Limpar Filtros</Button>
+                                   <Button variant="ghost" onClick={() => setFilters({ responsibleId: '', deadline: null, clientId: '', projectId: '' })}>Limpar Filtros</Button>
                               </div>
                           </PopoverContent>
                       </Popover>
@@ -495,22 +528,31 @@ export default function DashboardPage() {
               <CardContent>
                   <ScrollArea className="h-96">
                       {isLoading ? Array.from({length: 5}).map((_, i) => <Skeleton key={i} className="h-10 w-full mb-2" />) :
-                       filteredTasks.length > 0 ? filteredTasks.map(task => (
-                           <Link key={task.id} href={`/clients/${task.clientId}/projects/${task.projectId}`} className="block">
-                               <div className="flex items-center justify-between p-2 rounded-md hover:bg-secondary">
-                                   <div><p className="font-medium">{task.text}</p><p className="text-sm text-muted-foreground">{task.projectName}</p></div>
-                                   <div className="text-right">
-                                       <div className="flex items-center justify-end gap-1">
-                                            {(task.responsibleIds || []).map(userId => {
-                                                const user = users.find(u => u.id === userId);
-                                                return user ? <Badge key={userId} variant="outline" className="flex items-center gap-1"><UserIcon size={12}/>{user.name.split(' ')[0]}</Badge> : null;
-                                            })}
+                       filteredTasks.length > 0 ? filteredTasks.map(task => {
+                           const client = clients.find(c => c.id === task.clientId);
+                           return (
+                               <Link key={task.id} href={`/clients/${task.clientId}/projects/${task.projectId}`} className="block">
+                                   <div className="flex items-center justify-between p-2 rounded-md hover:bg-secondary">
+                                       <div>
+                                           <p className="font-medium">{task.text}</p>
+                                           <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                                <UserRound className="h-3 w-3" /><span>{client?.name || 'Cliente'}</span>
+                                                <FolderOpen className="h-3 w-3" /><span>{task.projectName}</span>
+                                           </div>
                                        </div>
-                                       {task.deadline && (<p className={cn("text-xs text-muted-foreground", new Date(task.deadline.toDate()) < new Date() && !task.completed ? 'text-red-400' : '')}>Prazo: {format(task.deadline.toDate(), 'dd/MM/yyyy')}</p>)}
+                                       <div className="text-right">
+                                           <div className="flex items-center justify-end gap-1">
+                                                {(task.responsibleIds || []).map(userId => {
+                                                    const user = users.find(u => u.id === userId);
+                                                    return user ? <Badge key={userId} variant="outline" className="flex items-center gap-1"><UserIcon size={12}/>{user.name.split(' ')[0]}</Badge> : null;
+                                                })}
+                                           </div>
+                                           {task.deadline && (<p className={cn("text-xs text-muted-foreground", new Date(task.deadline.toDate()) < new Date() && !task.completed ? 'text-red-400' : '')}>Prazo: {format(task.deadline.toDate(), 'dd/MM/yyyy')}</p>)}
+                                       </div>
                                    </div>
-                               </div>
-                           </Link>
-                       )) : (
+                               </Link>
+                           )
+                       }) : (
                           <p className="text-muted-foreground text-center py-8">Nenhuma tarefa pendente encontrada.</p>
                        )}
                   </ScrollArea>

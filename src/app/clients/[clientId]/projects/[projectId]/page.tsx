@@ -11,30 +11,187 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Progress } from '@/components/ui/progress';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
-import { PlusCircle, Loader2, Trash2, GripVertical, Check, X, Pencil, CheckCircle2, ArrowLeft, CalendarIcon, Filter, User, Clock, DollarSign, BarChart2, ChevronsUpDown } from 'lucide-react';
+import { PlusCircle, Loader2, Trash2, GripVertical, Check, X, Pencil, CheckCircle2, ArrowLeft, CalendarIcon, Filter, User, Clock, DollarSign, BarChart2, ChevronsUpDown, Flame, MessageSquare, Eye, EyeOff, CornerDownRight, Plus } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { db } from '@/lib/firebase';
-import { collection, onSnapshot, doc, updateDoc, arrayUnion, arrayRemove, getDoc, Timestamp } from 'firebase/firestore';
+import { collection, onSnapshot, doc, updateDoc, arrayUnion, Timestamp } from 'firebase/firestore';
 import type { Project, ProjectSection, Task, User as AppUser, LoggedTime } from '@/lib/types';
 import { cn, formatCurrency } from '@/lib/utils';
 import { format } from 'date-fns';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog"
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Dialog, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogContent, DialogClose } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
+import { Textarea } from '@/components/ui/textarea';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 
+const priorityOrder: { [key in Task['priority']]: number } = {
+    'Alta': 1,
+    'Média': 2,
+    'Baixa': 3,
+};
+
+type NewTaskState = { text: string; responsibleIds: string[]; deadline?: Date; priority: Task['priority']; parentId?: string };
+
+// Moved AddNewTaskInput outside of ProjectDetailPage to prevent re-renders from causing focus loss.
+const AddNewTaskInput = ({ 
+    sectionId, 
+    parentId,
+    newTask,
+    setNewTask,
+    users,
+    handleAddTask,
+    setIsAddingSubTask,
+}: {
+    sectionId: string,
+    parentId?: string,
+    newTask: { [key: string]: NewTaskState },
+    setNewTask: React.Dispatch<React.SetStateAction<{ [key: string]: NewTaskState }>>,
+    users: AppUser[],
+    handleAddTask: (sectionId: string, parentId?: string) => void,
+    setIsAddingSubTask: (parentId: string | null) => void,
+}) => (
+    <div className={cn("flex items-start md:items-center gap-2 pt-4 flex-col md:flex-row", parentId && "ml-8 pl-6 border-l-2")}>
+        <Input 
+            placeholder="Adicionar nova tarefa..." 
+            className="h-9 flex-1 min-w-[200px]"
+            value={newTask[sectionId]?.text || ""}
+            onChange={(e) => setNewTask(prev => ({...prev, [sectionId]: {...(prev[sectionId] || {responsibleIds: [], priority: 'Média'}), text: e.target.value}}))}
+        />
+        <Select 
+            defaultValue="Média" 
+            onValueChange={(value: Task['priority']) => setNewTask(prev => ({...prev, [sectionId]: {...(prev[sectionId] || {text: '', responsibleIds: []}), priority: value}}))}
+        >
+            <SelectTrigger className="h-9 w-full md:w-[120px]"><SelectValue/></SelectTrigger>
+            <SelectContent><SelectItem value="Alta">Alta</SelectItem><SelectItem value="Média">Média</SelectItem><SelectItem value="Baixa">Baixa</SelectItem></SelectContent>
+        </Select>
+
+        <Popover>
+            <PopoverTrigger asChild>
+                <Button variant="outline" role="combobox" className="h-9 w-full md:w-[200px] justify-between">
+                    {(newTask[sectionId]?.responsibleIds || []).length > 0
+                        ? `${(newTask[sectionId]?.responsibleIds || []).length} selecionado(s)`
+                        : "Responsáveis..."}
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-[200px] p-0">
+                <Command>
+                    <CommandInput placeholder="Procurar membro..." />
+                    <CommandEmpty>Nenhum membro encontrado.</CommandEmpty>
+                    <CommandGroup><CommandList>
+                            {users.map((user) => (
+                                <CommandItem key={user.id} onSelect={() => {
+                                    setNewTask(prev => {
+                                        const currentIds = prev[sectionId]?.responsibleIds || [];
+                                        const newIds = currentIds.includes(user.id) ? currentIds.filter(id => id !== user.id) : [...currentIds, user.id];
+                                        return {...prev, [sectionId]: {...(prev[sectionId] || {text:'', priority: 'Média'}), responsibleIds: newIds}};
+                                    })
+                                }}>
+                                    <Check className={cn("mr-2 h-4 w-4", (newTask[sectionId]?.responsibleIds || []).includes(user.id) ? "opacity-100" : "opacity-0")}/>
+                                    {user.name}
+                                </CommandItem>
+                            ))}
+                    </CommandList></CommandGroup>
+                </Command>
+            </PopoverContent>
+        </Popover>
+        <Popover>
+            <PopoverTrigger asChild>
+                <Button
+                variant={"outline"}
+                className={cn("h-9 w-full md:w-[180px] justify-start text-left font-normal", !newTask[sectionId]?.deadline && "text-muted-foreground")}>
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {newTask[sectionId]?.deadline ? format(newTask[sectionId].deadline as Date, "PPP") : <span>Prazo</span>}
+                </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0">
+                <Calendar
+                mode="single"
+                selected={newTask[sectionId]?.deadline}
+                onSelect={(date) => setNewTask(prev => ({...prev, [sectionId]: {...(prev[sectionId] || {text: '', responsibleIds: [], priority: 'Média'}), deadline: date as Date}}))}
+                initialFocus/>
+            </PopoverContent>
+        </Popover>
+        <Button size="sm" onClick={() => handleAddTask(sectionId, parentId)}>Adicionar</Button>
+        {parentId && <Button size="icon" variant="ghost" onClick={() => setIsAddingSubTask(null)}><X className="h-4 w-4"/></Button>}
+    </div>
+);
+
+
+// Recursive Task Component
+const TaskItem: React.FC<{ 
+    task: Task; 
+    allTasks: Task[];
+    level: number;
+    users: AppUser[];
+    onToggle: (taskId: string, completed: boolean) => void;
+    onDelete: (taskId: string) => void;
+    onEdit: (task: Task) => void;
+    onLogTime: (taskId: string, currentLogs: LoggedTime[] | undefined) => void;
+    onAddSubTask: (parentId: string) => void;
+}> = ({ task, allTasks, level, users, onToggle, onDelete, onEdit, onLogTime, onAddSubTask }) => {
+    const subTasks = allTasks.filter(sub => sub.parentId === task.id).sort((a,b) => (priorityOrder[a.priority] || 3) - (priorityOrder[b.priority] || 3));
+    const totalHoursForTask = (t: Task) => (t.timeLogs || []).reduce((acc, log) => acc + log.hours, 0);
+    const priorityBadgeVariant = { 'Alta': 'destructive', 'Média': 'secondary', 'Baixa': 'outline' } as const;
+
+    return (
+        <Collapsible defaultOpen>
+            <div className={cn("flex items-center gap-2 group p-2 rounded-md hover:bg-secondary/20", level > 0 && "ml-4 border-l-2 pl-4 border-dashed")}>
+                <Checkbox id={task.id} checked={task.completed} onCheckedChange={(checked) => onToggle(task.id, !!checked)} />
+                <CollapsibleTrigger asChild>
+                    <label htmlFor={task.id} className={cn('flex-1 text-sm cursor-pointer', task.completed && 'line-through text-muted-foreground')}>
+                        {task.text}
+                    </label>
+                </CollapsibleTrigger>
+                
+                <div className="flex items-center gap-2 ml-auto">
+                    {task.description && <Badge variant="outline" className="hidden sm:flex items-center gap-1"><MessageSquare size={12}/>Nota</Badge>}
+                    <Badge variant={priorityBadgeVariant[task.priority]} className="flex items-center gap-1"><Flame size={12}/>{task.priority}</Badge>
+                    <div className="hidden sm:flex items-center gap-1">
+                        {(task.responsibleIds || []).map(userId => {
+                            const user = users.find(u => u.id === userId);
+                            return user ? <Badge key={userId} variant="outline" className="flex items-center gap-1"><User size={12}/>{user.name.split(' ')[0]}</Badge> : null;
+                        })}
+                    </div>
+                    {task.deadline && (
+                        <Badge variant="outline" className={cn("hidden sm:flex items-center gap-1", new Date(task.deadline.toDate()) < new Date() && !task.completed ? 'text-red-400 border-red-400/50' : '')}>
+                            <CalendarIcon size={12}/>{format(task.deadline.toDate(), 'dd/MM/yy')}
+                        </Badge>
+                    )}
+                    {totalHoursForTask(task) > 0 && <Badge variant="secondary" className="flex items-center gap-1"><Clock size={12}/>{totalHoursForTask(task)}h</Badge>}
+                    
+                    <div className="opacity-0 group-hover:opacity-100 transition-opacity">
+                         <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => onAddSubTask(task.id)}><Plus className="h-3 w-3"/></Button>
+                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => onLogTime(task.id, task.timeLogs)}><Clock className="h-3 w-3"/></Button>
+                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => onEdit(task)}><Pencil className="h-3 w-3"/></Button>
+                        <AlertDialog>
+                            <AlertDialogTrigger asChild><Button variant="ghost" size="icon" className="h-6 w-6 text-destructive"><Trash2 className="h-3 w-3"/></Button></AlertDialogTrigger>
+                            <AlertDialogContent>
+                                <AlertDialogHeader><AlertDialogTitle>Excluir Tarefa?</AlertDialogTitle></AlertDialogHeader>
+                                <AlertDialogDescription>Esta ação não pode ser desfeita e excluirá também todas as sub-tarefas associadas.</AlertDialogDescription>
+                                <AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={() => onDelete(task.id)}>Excluir</AlertDialogAction></AlertDialogFooter>
+                            </AlertDialogContent>
+                        </AlertDialog>
+                    </div>
+                </div>
+            </div>
+             <CollapsibleContent className="pl-4">
+                {task.description && (
+                    <div className="ml-8 pl-4 py-2 border-l-2 border-dashed border-border text-sm text-muted-foreground whitespace-pre-wrap">
+                        {task.description}
+                    </div>
+                )}
+                {subTasks.map(subTask => (
+                    <TaskItem key={subTask.id} task={subTask} allTasks={allTasks} level={level + 1} users={users} onToggle={onToggle} onDelete={onDelete} onEdit={onEdit} onLogTime={onLogTime} onAddSubTask={onAddSubTask} />
+                ))}
+            </CollapsibleContent>
+        </Collapsible>
+    )
+}
 
 export default function ProjectDetailPage() {
     const params = useParams();
@@ -45,12 +202,17 @@ export default function ProjectDetailPage() {
     const [project, setProject] = useState<Project | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [newSectionTitle, setNewSectionTitle] = useState("");
-    const [newTask, setNewTask] = useState<{ [key: string]: { text: string; responsibleIds: string[], deadline?: Date } }>({});
-    const [editingItemId, setEditingItemId] = useState<string | null>(null);
-    const [editingText, setEditingText] = useState("");
+    const [newTask, setNewTask] = useState<{ [key: string]: NewTaskState }>({});
     
+    // Editing states
+    const [editingSection, setEditingSection] = useState<{ id: string; title: string } | null>(null);
+    const [editingTask, setEditingTask] = useState<Task | null>(null);
+    const [isAddingSubTask, setIsAddingSubTask] = useState<string | null>(null);
+
     const [users, setUsers] = useState<AppUser[]>([]);
     const [filters, setFilters] = useState({ responsibleId: '', deadline: null as Date | null });
+    
+    const [isValuesVisible, setIsValuesVisible] = useState(false);
     
     // Time tracking state
     const [isTimeLogDialogOpen, setIsTimeLogDialogOpen] = useState(false);
@@ -130,22 +292,37 @@ export default function ProjectDetailPage() {
         setNewSectionTitle("");
         toast({ title: "Seção Adicionada!" });
     };
+
+    const handleUpdateSectionTitle = async () => {
+        if (!editingSection || !editingSection.title.trim()) return;
+        
+        const updatedSections = project?.sections?.map(s => 
+            s.id === editingSection.id ? { ...s, title: editingSection.title.trim() } : s
+        );
+
+        await updateDoc(projectDocRef, { sections: updatedSections });
+        toast({ title: "Seção Atualizada!" });
+        setEditingSection(null);
+    };
     
-    const handleDeleteSection = async (section: ProjectSection) => {
-        const updatedSections = project?.sections?.filter(s => s.id !== section.id);
+    const handleDeleteSection = async (sectionId: string) => {
+        const updatedSections = project?.sections?.filter(s => s.id !== sectionId);
         await updateDoc(projectDocRef, { sections: updatedSections });
         toast({ title: "Seção Removida!", variant: "destructive"});
     };
 
-    const handleAddTask = async (sectionId: string) => {
+    const handleAddTask = async (sectionId: string, parentId?: string) => {
         const taskInput = newTask[sectionId];
         if (!taskInput || !taskInput.text.trim()) return;
         const task: Task = {
             id: `task_${Date.now()}`,
             text: taskInput.text.trim(),
+            description: "",
             responsibleIds: taskInput.responsibleIds,
+            priority: taskInput.priority || 'Média',
             completed: false,
             timeLogs: [],
+            ...(parentId && { parentId }),
             ...(taskInput.deadline && { deadline: Timestamp.fromDate(taskInput.deadline) })
         };
         
@@ -157,7 +334,8 @@ export default function ProjectDetailPage() {
         });
 
         await updateDoc(projectDocRef, { sections: updatedSections });
-        setNewTask(prev => ({ ...prev, [sectionId]: { text: "", responsibleIds: [] }}));
+        setNewTask(prev => ({ ...prev, [sectionId]: { text: "", responsibleIds: [], priority: 'Média', parentId: parentId }}));
+        if(parentId) setIsAddingSubTask(null);
     };
     
     const handleToggleTask = async (taskId: string, completed: boolean) => {
@@ -168,21 +346,47 @@ export default function ProjectDetailPage() {
          await updateDoc(projectDocRef, { sections: updatedSections });
     };
 
-    const handleUpdateTaskText = async (taskId: string) => {
-        if (!editingText) return;
+    const handleUpdateTask = async (event: React.FormEvent<HTMLFormElement>) => {
+        event.preventDefault();
+        if (!editingTask) return;
+
+        const formData = new FormData(event.currentTarget);
+        const updatedTaskData = {
+            text: formData.get('text') as string,
+            description: formData.get('description') as string,
+            deadline: formData.get('deadline') ? Timestamp.fromDate(new Date(formData.get('deadline') as string)) : null,
+            priority: formData.get('priority') as Task['priority'],
+            responsibleIds: formData.getAll('responsibleIds') as string[],
+        };
+
         const updatedSections = project?.sections?.map(s => ({
             ...s,
-            tasks: s.tasks.map(t => t.id === taskId ? { ...t, text: editingText } : t)
+            tasks: s.tasks.map(t => t.id === editingTask.id ? { ...t, ...updatedTaskData } : t)
         }));
+
         await updateDoc(projectDocRef, { sections: updatedSections });
-        setEditingItemId(null);
-        setEditingText("");
+        toast({ title: "Tarefa Atualizada" });
+        setEditingTask(null);
     };
 
-    const handleDeleteTask = async (taskId: string) => {
+
+    const handleDeleteTask = async (taskIdToDelete: string) => {
+        let allTasksToDelete = [taskIdToDelete];
+        let queue = [taskIdToDelete];
+    
+        // Find all nested sub-tasks
+        while (queue.length > 0) {
+            const currentParentId = queue.shift();
+            const childTasks = project?.sections?.flatMap(s => s.tasks).filter(t => t.parentId === currentParentId) || [];
+            for (const child of childTasks) {
+                allTasksToDelete.push(child.id);
+                queue.push(child.id);
+            }
+        }
+        
         const updatedSections = project?.sections?.map(s => ({
             ...s,
-            tasks: s.tasks.filter(t => t.id !== taskId)
+            tasks: s.tasks.filter(t => !allTasksToDelete.includes(t.id))
         }));
         await updateDoc(projectDocRef, { sections: updatedSections });
     };
@@ -191,6 +395,10 @@ export default function ProjectDetailPage() {
         setTimeLogData({ taskId, currentLogs: currentLogs || [] });
         setIsTimeLogDialogOpen(true);
     };
+    
+    const handleAddNewSubTask = (parentId: string) => {
+        setIsAddingSubTask(parentId);
+    }
 
     const handleLogTime = async (event: React.FormEvent<HTMLFormElement>) => {
         event.preventDefault();
@@ -228,17 +436,25 @@ export default function ProjectDetailPage() {
 
     const filteredSections = useMemo(() => {
         if (!project || !project.sections) return [];
-        if (!filters.responsibleId && !filters.deadline) {
-            return project.sections;
+        let sections = project.sections;
+
+        if (filters.responsibleId || filters.deadline) {
+             sections = sections?.map(section => {
+                const filteredTasks = (section.tasks || []).filter(task => {
+                    const responsibleMatch = !filters.responsibleId || (task.responsibleIds || []).includes(filters.responsibleId);
+                    const deadlineMatch = !filters.deadline || (task.deadline && format(task.deadline.toDate(), 'yyyy-MM-dd') === format(filters.deadline, 'yyyy-MM-dd'));
+                    return responsibleMatch && deadlineMatch;
+                });
+                return { ...section, tasks: filteredTasks };
+            }).filter(section => section.tasks.length > 0);
         }
-        return project.sections?.map(section => {
-            const filteredTasks = (section.tasks || []).filter(task => {
-                const responsibleMatch = !filters.responsibleId || (task.responsibleIds || []).includes(filters.responsibleId);
-                const deadlineMatch = !filters.deadline || (task.deadline && format(task.deadline.toDate(), 'yyyy-MM-dd') === format(filters.deadline, 'yyyy-MM-dd'));
-                return responsibleMatch && deadlineMatch;
-            });
-            return { ...section, tasks: filteredTasks };
-        }).filter(section => section.tasks.length > 0);
+
+        // Sort only top-level tasks within each section by priority
+        return sections.map(section => ({
+            ...section,
+            tasks: (section.tasks || []).filter(t => !t.parentId).sort((a, b) => (priorityOrder[a.priority] || 3) - (priorityOrder[b.priority] || 3)),
+        }));
+
     }, [project, filters]);
 
     if (isLoading) {
@@ -265,8 +481,7 @@ export default function ProjectDetailPage() {
     
     const progress = calculateProgress();
     const isCompleted = progress === 100;
-    const totalHoursForTask = (task: Task) => (task.timeLogs || []).reduce((acc, log) => acc + log.hours, 0);
-
+    
     return (
         <div className="space-y-6">
             <Button variant="outline" onClick={() => router.push(`/clients/${clientId}/projects`)} className="mb-4">
@@ -287,7 +502,7 @@ export default function ProjectDetailPage() {
                                     <CardDescription>Escopo: {project.scope}</CardDescription>
                                 </div>
                                 <div className="text-right">
-                                   <p className="text-lg font-bold">{formatCurrency(project.value)}</p>
+                                   <p className="text-lg font-bold">{isValuesVisible ? formatCurrency(project.value) : 'R$ ******'}</p>
                                    <Badge variant={isCompleted ? "default" : "secondary"} className={isCompleted ? "bg-green-500/20 text-green-400 border-green-500/30" : ""}>{project.status}</Badge>
                                 </div>
                             </div>
@@ -354,17 +569,22 @@ export default function ProjectDetailPage() {
 
                 <div className="lg:col-span-1">
                     <Card>
-                        <CardHeader>
-                            <CardTitle className="flex items-center gap-2"><BarChart2 />Análise Financeira</CardTitle>
+                         <CardHeader>
+                            <CardTitle className="flex items-center justify-between">
+                                <div className="flex items-center gap-2"><BarChart2 /> Análise Financeira</div>
+                                <Button variant="ghost" size="icon" onClick={() => setIsValuesVisible(!isValuesVisible)}>
+                                    {isValuesVisible ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                                </Button>
+                            </CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-4">
                             <div className="flex justify-between items-center p-3 bg-secondary/50 rounded-md">
                                 <span className="font-medium text-sm">Valor do Projeto</span>
-                                <span className="font-bold text-green-400">{formatCurrency(project.value)}</span>
+                                <span className="font-bold text-green-400">{isValuesVisible ? formatCurrency(project.value) : 'R$ ******'}</span>
                             </div>
                             <div className="flex justify-between items-center p-3 bg-secondary/50 rounded-md">
                                 <span className="font-medium text-sm">Custo Real</span>
-                                <span className="font-bold text-red-400">{formatCurrency(projectAnalysis.realCost)}</span>
+                                <span className="font-bold text-red-400">{isValuesVisible ? formatCurrency(projectAnalysis.realCost) : 'R$ ******'}</span>
                             </div>
                              <div className="flex justify-between items-center p-3 bg-secondary/50 rounded-md">
                                 <span className="font-medium text-sm">Horas Registradas</span>
@@ -373,7 +593,7 @@ export default function ProjectDetailPage() {
                             <div className="flex justify-between items-center p-3 bg-primary/10 rounded-md border border-primary/20">
                                 <span className="font-medium text-sm">Margem de Lucro</span>
                                 <span className={cn("font-bold text-lg", projectAnalysis.profitMargin >= 0 ? "text-primary" : "text-destructive")}>
-                                    {formatCurrency(projectAnalysis.profitMargin)}
+                                    {isValuesVisible ? formatCurrency(projectAnalysis.profitMargin) : 'R$ ******'}
                                 </span>
                             </div>
                         </CardContent>
@@ -392,147 +612,79 @@ export default function ProjectDetailPage() {
                     <Button onClick={handleAddSection}><PlusCircle/> Adicionar Seção</Button>
                 </div>
             </div>
-
-            <div className="space-y-6">
-                {filteredSections.map(section => (
-                    <Card key={section.id}>
-                        <CardHeader className="flex flex-row justify-between items-center bg-secondary/30 p-4">
-                            <h3 className="font-headline text-lg flex items-center gap-2"><GripVertical className="cursor-grab"/>{section.title}</h3>
-                             <AlertDialog>
-                                <AlertDialogTrigger asChild>
-                                    <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive">
-                                        <Trash2 className="h-4 w-4" />
-                                    </Button>
-                                </AlertDialogTrigger>
-                                <AlertDialogContent>
-                                    <AlertDialogHeader><AlertDialogTitle>Excluir Seção?</AlertDialogTitle></AlertDialogHeader>
-                                    <AlertDialogDescription>Isso removerá a seção e todas as suas tarefas. Essa ação não pode ser desfeita.</AlertDialogDescription>
-                                    <AlertDialogFooter>
-                                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                        <AlertDialogAction onClick={() => handleDeleteSection(section)}>Excluir</AlertDialogAction>
-                                    </AlertDialogFooter>
-                                </AlertDialogContent>
-                            </AlertDialog>
-                        </CardHeader>
-                        <CardContent className="p-4 space-y-2">
-                            {(section.tasks || []).map(task => (
-                                <div key={task.id} className="flex items-center gap-2 group p-2 rounded-md hover:bg-secondary/20">
-                                    <Checkbox 
-                                        id={task.id} 
-                                        checked={task.completed} 
-                                        onCheckedChange={(checked) => handleToggleTask(task.id, !!checked)} 
-                                    />
-                                    {editingItemId === task.id ? (
-                                        <div className="flex-1 flex items-center gap-2">
-                                            <Input value={editingText} onChange={(e) => setEditingText(e.target.value)} className="h-8"/>
-                                            <Button size="icon" className="h-8 w-8" onClick={() => handleUpdateTaskText(task.id)}><Check className="h-4 w-4"/></Button>
-                                            <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => setEditingItemId(null)}><X className="h-4 w-4"/></Button>
+            
+            <Accordion type="multiple" className="w-full space-y-4" defaultValue={project.sections?.map(s => s.id)}>
+                {(project.sections || []).map(section => (
+                     <AccordionItem value={section.id} key={section.id} className="border-b-0">
+                        <Card>
+                            <div className="flex items-center w-full p-4 hover:bg-secondary/5 rounded-t-lg">
+                                <AccordionTrigger className="flex-1 p-0 text-left hover:no-underline">
+                                    {editingSection?.id === section.id ? (
+                                        <div className="flex-1 flex gap-2 items-center">
+                                            <Input value={editingSection.title} onChange={(e) => setEditingSection({...editingSection, title: e.target.value})} className="h-9" onKeyDown={(e) => e.key === 'Enter' && handleUpdateSectionTitle()}/>
+                                            <Button size="icon" className="h-9 w-9" onClick={handleUpdateSectionTitle}><Check/></Button>
+                                            <Button size="icon" variant="ghost" className="h-9 w-9" onClick={() => setEditingSection(null)}><X/></Button>
                                         </div>
                                     ) : (
-                                        <label htmlFor={task.id} className={`flex-1 text-sm ${task.completed ? 'line-through text-muted-foreground' : ''}`}>
-                                            {task.text}
-                                        </label>
+                                        <h3 className="font-headline text-lg flex items-center gap-2"><GripVertical className="cursor-grab"/>{section.title}</h3>
                                     )}
-                                    <div className="flex items-center gap-2 ml-auto">
-                                        <div className="hidden sm:flex items-center gap-1">
-                                            {(task.responsibleIds || []).map(userId => {
-                                                const user = users.find(u => u.id === userId);
-                                                return user ? <Badge key={userId} variant="outline" className="flex items-center gap-1"><User size={12}/>{user.name.split(' ')[0]}</Badge> : null;
-                                            })}
-                                        </div>
-                                        {task.deadline && (
-                                            <Badge variant="outline" className={cn("hidden sm:flex items-center gap-1", new Date(task.deadline.toDate()) < new Date() && !task.completed ? 'text-red-400 border-red-400/50' : '')}>
-                                                <CalendarIcon size={12}/>{format(task.deadline.toDate(), 'dd/MM/yy')}
-                                            </Badge>
-                                        )}
-                                        {totalHoursForTask(task) > 0 && <Badge variant="secondary" className="flex items-center gap-1"><Clock size={12}/>{totalHoursForTask(task)}h</Badge>}
-                                        <div className="opacity-0 group-hover:opacity-100 transition-opacity">
-                                            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleOpenTimeLogDialog(task.id, task.timeLogs)}><Clock className="h-3 w-3"/></Button>
-                                            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => {setEditingItemId(task.id); setEditingText(task.text)}}><Pencil className="h-3 w-3"/></Button>
-                                            <AlertDialog>
-                                                <AlertDialogTrigger asChild>
-                                                    <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive"><Trash2 className="h-3 w-3"/></Button>
-                                                </AlertDialogTrigger>
-                                                 <AlertDialogContent>
-                                                    <AlertDialogHeader><AlertDialogTitle>Excluir Tarefa?</AlertDialogTitle></AlertDialogHeader>
-                                                    <AlertDialogDescription>Essa ação não pode ser desfeita.</AlertDialogDescription>
-                                                    <AlertDialogFooter>
-                                                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                                        <AlertDialogAction onClick={() => handleDeleteTask(task.id)}>Excluir</AlertDialogAction>
-                                                    </AlertDialogFooter>
-                                                </AlertDialogContent>
-                                            </AlertDialog>
-                                        </div>
-                                    </div>
+                                </AccordionTrigger>
+                                <div className="flex items-center pl-2">
+                                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); setEditingSection({id: section.id, title: section.title})}}><Pencil className="h-4 w-4" /></Button>
+                                    <AlertDialog>
+                                        <AlertDialogTrigger asChild>
+                                            <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={(e) => e.stopPropagation()}><Trash2 className="h-4 w-4" /></Button>
+                                        </AlertDialogTrigger>
+                                        <AlertDialogContent>
+                                            <AlertDialogHeader><AlertDialogTitle>Excluir Seção?</AlertDialogTitle></AlertDialogHeader>
+                                            <AlertDialogDescription>Isso removerá a seção e todas as suas tarefas. Essa ação não pode ser desfeita.</AlertDialogDescription>
+                                            <AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={() => handleDeleteSection(section.id)}>Excluir</AlertDialogAction></AlertDialogFooter>
+                                        </AlertDialogContent>
+                                    </AlertDialog>
                                 </div>
-                            ))}
-                            <div className="flex items-start md:items-center gap-2 pt-4 flex-col md:flex-row">
-                                <Input 
-                                    placeholder="Adicionar nova tarefa..." 
-                                    className="h-9 flex-1 min-w-[200px]"
-                                    value={newTask[section.id]?.text || ""}
-                                    onChange={(e) => setNewTask(prev => ({...prev, [section.id]: {...(prev[section.id] || {responsibleIds: []}), text: e.target.value}}))}
-                                />
-                                <Popover>
-                                    <PopoverTrigger asChild>
-                                        <Button variant="outline" role="combobox" className="h-9 w-full md:w-[200px] justify-between">
-                                            {newTask[section.id]?.responsibleIds?.length > 0
-                                                ? `${newTask[section.id]?.responsibleIds?.length} selecionado(s)`
-                                                : "Responsáveis..."}
-                                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                                        </Button>
-                                    </PopoverTrigger>
-                                    <PopoverContent className="w-[200px] p-0">
-                                        <Command>
-                                            <CommandInput placeholder="Procurar membro..." />
-                                            <CommandEmpty>Nenhum membro encontrado.</CommandEmpty>
-                                            <CommandGroup>
-                                                <CommandList>
-                                                    {users.map((user) => (
-                                                        <CommandItem key={user.id} onSelect={() => {
-                                                            setNewTask(prev => {
-                                                                const currentIds = prev[section.id]?.responsibleIds || [];
-                                                                const newIds = currentIds.includes(user.id) ? currentIds.filter(id => id !== user.id) : [...currentIds, user.id];
-                                                                return {...prev, [section.id]: {...(prev[section.id] || {text:''}), responsibleIds: newIds}};
-                                                            })
-                                                        }}>
-                                                            <Check className={cn("mr-2 h-4 w-4", (newTask[section.id]?.responsibleIds || []).includes(user.id) ? "opacity-100" : "opacity-0")}/>
-                                                            {user.name}
-                                                        </CommandItem>
-                                                    ))}
-                                                </CommandList>
-                                            </CommandGroup>
-                                        </Command>
-                                    </PopoverContent>
-                                </Popover>
-                                <Popover>
-                                    <PopoverTrigger asChild>
-                                        <Button
-                                        variant={"outline"}
-                                        className={cn(
-                                            "h-9 w-full md:w-[180px] justify-start text-left font-normal",
-                                            !newTask[section.id]?.deadline && "text-muted-foreground"
-                                        )}
-                                        >
-                                        <CalendarIcon className="mr-2 h-4 w-4" />
-                                        {newTask[section.id]?.deadline ? format(newTask[section.id].deadline, "PPP") : <span>Prazo</span>}
-                                        </Button>
-                                    </PopoverTrigger>
-                                    <PopoverContent className="w-auto p-0">
-                                        <Calendar
-                                        mode="single"
-                                        selected={newTask[section.id]?.deadline}
-                                        onSelect={(date) => setNewTask(prev => ({...prev, [section.id]: {...(prev[section.id] || {text: '', responsibleIds: []}), deadline: date as Date}}))}
-                                        initialFocus
-                                        />
-                                    </PopoverContent>
-                                </Popover>
-                                <Button size="sm" onClick={() => handleAddTask(section.id)}>Adicionar</Button>
                             </div>
-                        </CardContent>
-                    </Card>
+                            <AccordionContent className="p-4 pt-0 space-y-2">
+                                {(section.tasks || []).filter(t => !t.parentId).map(task => (
+                                    <TaskItem 
+                                        key={task.id} 
+                                        task={task} 
+                                        allTasks={section.tasks}
+                                        level={0}
+                                        users={users}
+                                        onToggle={handleToggleTask}
+                                        onDelete={handleDeleteTask}
+                                        onEdit={setEditingTask}
+                                        onLogTime={handleOpenTimeLogDialog}
+                                        onAddSubTask={handleAddNewSubTask}
+                                    />
+                                ))}
+
+                                {isAddingSubTask && (project.sections || []).find(s => s.tasks.some(t => t.id === isAddingSubTask))?.id === section.id ? (
+                                    <AddNewTaskInput 
+                                        sectionId={section.id} 
+                                        parentId={isAddingSubTask} 
+                                        newTask={newTask}
+                                        setNewTask={setNewTask}
+                                        users={users}
+                                        handleAddTask={handleAddTask}
+                                        setIsAddingSubTask={setIsAddingSubTask}
+                                    />
+                                ) : (
+                                    <AddNewTaskInput 
+                                        sectionId={section.id}
+                                        newTask={newTask}
+                                        setNewTask={setNewTask}
+                                        users={users}
+                                        handleAddTask={handleAddTask}
+                                        setIsAddingSubTask={setIsAddingSubTask}
+                                    />
+                                )}
+                            </AccordionContent>
+                        </Card>
+                    </AccordionItem>
                 ))}
-            </div>
+            </Accordion>
+
 
             <Dialog open={isTimeLogDialogOpen} onOpenChange={setIsTimeLogDialogOpen}>
                 <DialogContent>
@@ -561,6 +713,77 @@ export default function ProjectDetailPage() {
                             <Button type="submit">Registrar Horas</Button>
                         </DialogFooter>
                     </form>
+                </DialogContent>
+            </Dialog>
+            
+            <Dialog open={!!editingTask} onOpenChange={(isOpen) => !isOpen && setEditingTask(null)}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Editar Tarefa</DialogTitle>
+                    </DialogHeader>
+                     <form onSubmit={handleUpdateTask} className="space-y-4">
+                        <div>
+                            <Label htmlFor="task-text">Texto da Tarefa</Label>
+                            <Input id="task-text" name="text" defaultValue={editingTask?.text} required />
+                        </div>
+                        <div>
+                            <Label htmlFor="task-description">Descrição/Comentário (Opcional)</Label>
+                            <Textarea id="task-description" name="description" defaultValue={editingTask?.description} rows={4} placeholder="Adicione detalhes, links ou qualquer informação extra sobre a tarefa aqui." />
+                        </div>
+                        <div>
+                            <Label>Responsáveis</Label>
+                             <Popover>
+                                <PopoverTrigger asChild>
+                                    <Button variant="outline" role="combobox" className="w-full justify-between">
+                                        {(editingTask?.responsibleIds || []).length > 0
+                                            ? `${(editingTask?.responsibleIds || []).length} selecionado(s)`
+                                            : "Selecione..."}
+                                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                    </Button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
+                                    <Command>
+                                        <CommandInput placeholder="Procurar membro..." />
+                                        <CommandEmpty>Nenhum membro encontrado.</CommandEmpty>
+                                        <CommandGroup><CommandList>
+                                                {users.map((user) => (
+                                                    <CommandItem key={user.id} onSelect={() => {
+                                                        setEditingTask(prev => {
+                                                            if (!prev) return null;
+                                                            const currentIds = prev.responsibleIds || [];
+                                                            const newIds = currentIds.includes(user.id) ? currentIds.filter(id => id !== user.id) : [...currentIds, user.id];
+                                                            return {...prev, responsibleIds: newIds};
+                                                        })
+                                                    }}>
+                                                        <Check className={cn("mr-2 h-4 w-4", (editingTask?.responsibleIds || []).includes(user.id) ? "opacity-100" : "opacity-0")}/>
+                                                        {user.name}
+                                                    </CommandItem>
+                                                ))}
+                                        </CommandList></CommandGroup>
+                                    </Command>
+                                </PopoverContent>
+                            </Popover>
+                             {/* Hidden inputs to submit responsibleIds array */}
+                            {(editingTask?.responsibleIds || []).map(id => <input key={id} type="hidden" name="responsibleIds" value={id} />)}
+                        </div>
+                         <div className="grid grid-cols-2 gap-4">
+                             <div>
+                                <Label htmlFor="task-deadline">Prazo</Label>
+                                <Input id="task-deadline" name="deadline" type="date" defaultValue={editingTask?.deadline ? format(editingTask.deadline.toDate(), 'yyyy-MM-dd') : ''} />
+                            </div>
+                             <div>
+                                <Label htmlFor="task-priority">Prioridade</Label>
+                                <Select name="priority" defaultValue={editingTask?.priority || 'Média'}>
+                                    <SelectTrigger id="task-priority"><SelectValue/></SelectTrigger>
+                                    <SelectContent><SelectItem value="Alta">Alta</SelectItem><SelectItem value="Média">Média</SelectItem><SelectItem value="Baixa">Baixa</SelectItem></SelectContent>
+                                </Select>
+                            </div>
+                         </div>
+                         <DialogFooter>
+                             <DialogClose asChild><Button type="button" variant="outline">Cancelar</Button></DialogClose>
+                            <Button type="submit">Salvar Alterações</Button>
+                         </DialogFooter>
+                     </form>
                 </DialogContent>
             </Dialog>
 
