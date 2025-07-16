@@ -10,7 +10,7 @@ import { PlusCircle, Loader2, Trash2, CheckSquare, X, Wand2 } from 'lucide-react
 import { useToast } from '@/hooks/use-toast';
 import { db } from '@/lib/firebase';
 import { collection, addDoc, onSnapshot, doc, deleteDoc, writeBatch } from 'firebase/firestore';
-import type { ProcessoTemplate, ProcessoItem } from '@/lib/types';
+import type { PlaybookTemplate, PlaybookItem } from '@/lib/types';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 
@@ -87,21 +87,21 @@ const suggestedTemplates = [
 export default function ProcessosPage() {
     const { toast } = useToast();
 
-    const [templates, setTemplates] = useState<ProcessoTemplate[]>([]);
+    const [templates, setTemplates] = useState<PlaybookTemplate[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
     const [isSeeding, setIsSeeding] = useState(false);
     
     // States for creating a new template
     const [newTemplateTitle, setNewTemplateTitle] = useState('');
-    const [newTemplateItems, setNewTemplateItems] = useState<Omit<ProcessoItem, 'completed'>[]>([]);
+    const [newTemplateItems, setNewTemplateItems] = useState<Omit<PlaybookItem, 'completed'>[]>([]);
     const [newItemText, setNewItemText] = useState('');
 
     const templatesCollectionRef = useMemo(() => collection(db, 'agency', 'internal', 'processo_templates'), []);
 
     useEffect(() => {
         const unsubscribe = onSnapshot(templatesCollectionRef, (snapshot) => {
-            const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ProcessoTemplate));
+            const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PlaybookTemplate));
             setTemplates(data);
             setIsLoading(false);
         });

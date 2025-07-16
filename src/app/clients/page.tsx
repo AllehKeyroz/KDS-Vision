@@ -6,7 +6,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { db } from '@/lib/firebase';
 import { collection, addDoc, onSnapshot, doc, updateDoc, deleteDoc, writeBatch } from 'firebase/firestore';
-import type { Client, ProcessoTemplate } from '@/lib/types';
+import type { Client, PlaybookTemplate } from '@/lib/types';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -37,7 +37,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 
 export default function ClientsPage() {
   const [clients, setClients] = useState<Client[]>([]);
-  const [processoTemplates, setProcessoTemplates] = useState<ProcessoTemplate[]>([]);
+  const [processoTemplates, setProcessoTemplates] = useState<PlaybookTemplate[]>([]);
   const [selectedProcessos, setSelectedProcessos] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -65,7 +65,7 @@ export default function ClientsPage() {
     
     const templatesCollectionRef = collection(db, 'agency', 'internal', 'processo_templates');
     const unsubscribeTemplates = onSnapshot(templatesCollectionRef, (snapshot) => {
-        setProcessoTemplates(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ProcessoTemplate)));
+        setProcessoTemplates(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PlaybookTemplate)));
     });
 
     return () => {

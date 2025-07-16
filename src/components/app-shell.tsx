@@ -3,7 +3,7 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Briefcase, LayoutDashboard, Users, Folder, Megaphone, Presentation, Settings, Users2, Building, DollarSign, FileText, LogOut, Loader2, ChevronsUpDown, Check, User, Wand2, CheckSquare, AlertTriangle, KeyRound } from 'lucide-react';
+import { Briefcase, LayoutDashboard, Users, Folder, Megaphone, Presentation, Settings, Users2, Building, DollarSign, FileText, LogOut, Loader2, ChevronsUpDown, Check, User, Wand2, CheckSquare, AlertTriangle, KeyRound, Link as LinkIcon } from 'lucide-react';
 import {
   SidebarProvider,
   Sidebar,
@@ -31,7 +31,9 @@ const agencyNav = [
     { name: 'Prospecção', href: '/prospects', icon: Briefcase },
     { name: 'Financeiro', href: '/financials', icon: DollarSign },
     { name: 'Equipe', href: '/users', icon: Users2 },
-    { name: 'Agência', href: '/agency', icon: Building },
+    { name: 'Acessos Internos', href: '/agency/access', icon: KeyRound },
+    { name: 'Links Úteis', href: '/agency/links', icon: LinkIcon },
+    { name: 'Processos', href: '/agency/processos', icon: CheckSquare },
     { name: 'Relatórios', href: '/reports', icon: Presentation, disabled: true },
     { name: 'Configurações', href: '/settings', icon: Settings, disabled: true },
 ]
