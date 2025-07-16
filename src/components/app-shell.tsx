@@ -2,7 +2,7 @@
 'use client';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Briefcase, LayoutDashboard, Users, Search, Folder, Megaphone, Presentation, Settings, Users2, Building, DollarSign, FileText } from 'lucide-react';
+import { Briefcase, LayoutDashboard, Users, Folder, Megaphone, Presentation, Settings, Users2, Building, DollarSign, FileText, LogOut } from 'lucide-react';
 import {
   SidebarProvider,
   Sidebar,
@@ -12,15 +12,48 @@ import {
   SidebarMenuItem,
   SidebarMenuButton,
   SidebarFooter,
-  SidebarTrigger,
-  SidebarInset,
 } from '@/components/ui/sidebar';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from './ui/button';
-import { Input } from './ui/input';
+import { useAuth } from '@/hooks/use-auth';
+import { Skeleton } from './ui/skeleton';
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const { authUser, loading, signOut } = useAuth();
+
+  if (loading) {
+     return (
+      <div className="flex min-h-svh">
+        <div className="hidden md:block p-2">
+           <div className="bg-card/50 p-2 rounded-lg flex flex-col h-full w-[240px]">
+              <div className="p-2 space-y-2">
+                <Skeleton className="h-8 w-full" />
+                <Skeleton className="h-4 w-3/4" />
+              </div>
+               <div className="flex-1 p-2 space-y-2">
+                <Skeleton className="h-8 w-full" />
+                <Skeleton className="h-8 w-full" />
+                <Skeleton className="h-8 w-full" />
+                <Skeleton className="h-8 w-full" />
+              </div>
+              <div className="p-2">
+                 <Skeleton className="h-12 w-full" />
+              </div>
+           </div>
+        </div>
+        <main className="flex-1 p-4 sm:p-6 lg:p-8">
+            <Skeleton className="h-full w-full" />
+        </main>
+      </div>
+    );
+  }
+
+  if (!authUser) {
+    // This should be handled by middleware, but as a fallback:
+    return <>{children}</>;
+  }
+
 
   return (
     <SidebarProvider>
@@ -130,12 +163,27 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </SidebarMenuItem>
           </SidebarMenu>
         </SidebarContent>
+        <SidebarFooter className="p-2">
+            <div className="p-2 rounded-lg bg-secondary/50 flex flex-col gap-2">
+                <div className="flex items-center gap-2">
+                     <Avatar className="h-9 w-9">
+                        <AvatarImage src={authUser.photoURL ?? ''} alt={authUser.displayName || ''} data-ai-hint="avatar person" />
+                        <AvatarFallback>{authUser.displayName?.[0] || authUser.email?.[0]}</AvatarFallback>
+                    </Avatar>
+                    <div className="flex flex-col truncate">
+                        <p className="font-semibold text-sm truncate">{authUser.displayName || 'Usuário'}</p>
+                        <p className="text-xs text-muted-foreground truncate">{authUser.email}</p>
+                    </div>
+                </div>
+                 <Button variant="ghost" size="sm" className="w-full justify-start" onClick={signOut}>
+                    <LogOut className="mr-2 h-4 w-4" /> Sair
+                </Button>
+            </div>
+        </SidebarFooter>
       </Sidebar>
-      <SidebarInset className="bg-background min-h-svh">
-        <main className="flex-1 p-4 sm:p-6 lg:p-8">
+      <main className="flex-1 p-4 sm:p-6 lg:p-8">
             {children}
-        </main>
-      </SidebarInset>
+      </main>
     </SidebarProvider>
   );
 }
