@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -528,34 +528,38 @@ export default function DashboardPage() {
                 </div>
             </CardHeader>
             <CardContent>
-                <Calendar
-                    mode="single"
-                    selected={selectedDate}
-                    onSelect={(date) => setSelectedDate(date)}
-                    className="p-0 rounded-md border"
-                    locale={ptBR}
-                    modifiers={{ scheduled: appointmentDates }}
-                    modifiersClassNames={{
-                        scheduled: 'relative after:absolute after:bottom-1 after:left-1/2 after:-translate-x-1/2 after:w-1 after:h-1 after:rounded-full after:bg-primary',
-                    }}
-                />
-                 <div className="mt-4 space-y-2">
-                    <h4 className="font-semibold">Compromissos para {selectedDate ? format(selectedDate, 'dd/MM/yyyy') : '...'}:</h4>
-                    {dailyAppointments.length > 0 ? (
-                        <ScrollArea className="h-40">
-                        {dailyAppointments.map(app => (
-                            <div key={app.id} onClick={() => handleOpenAppointmentDialog(app)} className="text-sm p-2 rounded-md bg-secondary/50 mb-1 cursor-pointer hover:bg-secondary">
-                                <p className="font-bold">{app.title}</p>
-                                <p className="text-xs text-muted-foreground">Horário: {format(app.date, 'HH:mm')}</p>
-                                {app.userIds && <p className="text-xs text-muted-foreground">Responsáveis: {app.userIds.map(uid => users.find(u => u.id === uid)?.name || '').join(', ')}</p>}
-                                {app.notes && <p className="text-xs mt-1">{app.notes}</p>}
-                            </div>
-                        ))}
-                        </ScrollArea>
-                    ) : (
-                        <p className="text-sm text-muted-foreground">Nenhum compromisso para esta data.</p>
-                    )}
-                 </div>
+                {selectedDate === undefined ? <Skeleton className="h-[298px] w-full" /> : 
+                  <>
+                    <Calendar
+                        mode="single"
+                        selected={selectedDate}
+                        onSelect={(date) => setSelectedDate(date)}
+                        className="p-0 rounded-md border"
+                        locale={ptBR}
+                        modifiers={{ scheduled: appointmentDates }}
+                        modifiersClassNames={{
+                            scheduled: 'relative after:absolute after:bottom-1 after:left-1/2 after:-translate-x-1/2 after:w-1 after:h-1 after:rounded-full after:bg-primary',
+                        }}
+                    />
+                    <div className="mt-4 space-y-2">
+                        <h4 className="font-semibold">Compromissos para {selectedDate ? format(selectedDate, 'dd/MM/yyyy') : '...'}:</h4>
+                        {dailyAppointments.length > 0 ? (
+                            <ScrollArea className="h-40">
+                            {dailyAppointments.map(app => (
+                                <div key={app.id} onClick={() => handleOpenAppointmentDialog(app)} className="text-sm p-2 rounded-md bg-secondary/50 mb-1 cursor-pointer hover:bg-secondary">
+                                    <p className="font-bold">{app.title}</p>
+                                    <p className="text-xs text-muted-foreground">Horário: {format(app.date, 'HH:mm')}</p>
+                                    {app.userIds && <p className="text-xs text-muted-foreground">Responsáveis: {app.userIds.map(uid => users.find(u => u.id === uid)?.name || '').join(', ')}</p>}
+                                    {app.notes && <p className="text-xs mt-1">{app.notes}</p>}
+                                </div>
+                            ))}
+                            </ScrollArea>
+                        ) : (
+                            <p className="text-sm text-muted-foreground">Nenhum compromisso para esta data.</p>
+                        )}
+                    </div>
+                  </>
+                }
             </CardContent>
           </Card>
       </div>
