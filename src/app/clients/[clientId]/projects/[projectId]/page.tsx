@@ -339,7 +339,6 @@ export default function ProjectDetailPage() {
                                         mode="single"
                                         selected={filters.deadline as Date | undefined}
                                         onSelect={(date) => setFilters(f => ({...f, deadline: date || null}))}
-                                        initialFocus
                                         />
                                     </PopoverContent>
                                 </Popover>
@@ -523,7 +522,6 @@ export default function ProjectDetailPage() {
                                         mode="single"
                                         selected={newTask[section.id]?.deadline}
                                         onSelect={(date) => setNewTask(prev => ({...prev, [section.id]: {...(prev[section.id] || {text: '', responsibleIds: []}), deadline: date as Date}}))}
-                                        initialFocus
                                         />
                                     </PopoverContent>
                                 </Popover>
