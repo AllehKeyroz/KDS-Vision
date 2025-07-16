@@ -3,7 +3,7 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Briefcase, LayoutDashboard, Users, Folder, Megaphone, Presentation, Settings, Users2, Building, DollarSign, FileText, LogOut, Loader2, ChevronsUpDown, Check, User, Wand2, CheckSquare, AlertTriangle, KeyRound, Link as LinkIcon } from 'lucide-react';
+import { Briefcase, LayoutDashboard, Users, Folder, Megaphone, Presentation, Settings, Users2, Building, DollarSign, FileText, LogOut, Loader2, ChevronsUpDown, Check, User, Wand2, CheckSquare, AlertTriangle, KeyRound, Link as LinkIcon, Puzzle, MessageSquare } from 'lucide-react';
 import {
   SidebarProvider,
   Sidebar,
@@ -13,6 +13,7 @@ import {
   SidebarMenuItem,
   SidebarMenuButton,
   SidebarFooter,
+  SidebarTrigger,
 } from '@/components/ui/sidebar';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from './ui/button';
@@ -26,6 +27,7 @@ import type { Client } from '@/lib/types';
 
 const agencyNav = [
     { name: 'Dashboard', href: '/', icon: LayoutDashboard },
+    { name: 'Atendimento', href: '/atendimento', icon: MessageSquare },
     { name: 'Clientes', href: '/clients', icon: Users },
     { name: 'Propostas', href: '/proposals', icon: FileText },
     { name: 'Prospecção', href: '/prospects', icon: Briefcase },
@@ -34,6 +36,7 @@ const agencyNav = [
     { name: 'Acessos Internos', href: '/agency/access', icon: KeyRound },
     { name: 'Links Úteis', href: '/agency/links', icon: LinkIcon },
     { name: 'Processos', href: '/agency/processos', icon: CheckSquare },
+    { name: 'Chaves de API', href: '/agency/keys', icon: Puzzle },
     { name: 'Relatórios', href: '/reports', icon: Presentation, disabled: true },
     { name: 'Configurações', href: '/settings', icon: Settings, disabled: true },
 ]
@@ -237,8 +240,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </div>
         </SidebarFooter>
       </Sidebar>
-      <main className="flex-1 p-4 sm:p-6 lg:p-8">
+      <main className="flex-1">
+        <header className="flex h-14 items-center gap-4 border-b bg-background/50 px-4 md:hidden">
+          <SidebarTrigger />
+          <h1 className="text-lg font-semibold">Keyroz Vision</h1>
+        </header>
+        <div className="p-4 sm:p-6 lg:p-8">
             {children}
+        </div>
       </main>
     </SidebarProvider>
   );

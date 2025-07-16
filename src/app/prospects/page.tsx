@@ -11,7 +11,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { db } from '@/lib/firebase';
-import { collection, addDoc, onSnapshot, doc, updateDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, addDoc, onSnapshot, doc, updateDoc, deleteDoc, serverTimestamp, writeBatch } from 'firebase/firestore';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
@@ -129,8 +129,9 @@ export default function ProspectsPage() {
             setScrapedResults(results);
             if (results.length > 0) {
                  setIsScrapeResultsDialogOpen(true);
+            } else {
+                toast({ title: 'Nenhum resultado', description: 'A busca não retornou prospects. Tente outros termos.', variant: 'destructive' });
             }
-            toast({ title: 'Busca Concluída!', description: `${results.length} prospects encontrados.` });
         } catch (error) {
             toast({ title: "Erro na Busca", description: (error as Error).message || "Não foi possível buscar os prospects. Verifique sua chave de API e tente novamente.", variant: "destructive" });
         } finally {
@@ -177,8 +178,8 @@ export default function ProspectsPage() {
 
             <Card>
                 <CardHeader>
-                    <CardTitle className="font-headline">Prospecção Automática com IA</CardTitle>
-                    <CardDescription>Use a API da Outscraper para encontrar novos leads no Google Maps e adicioná-los diretamente ao seu funil.</CardDescription>
+                    <CardTitle className="font-headline">Prospecção Automática</CardTitle>
+                    <CardDescription>Encontre novos leads no Google Maps. A chave de API pode ser configurada no Painel da Agência.</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -283,21 +284,40 @@ export default function ProspectsPage() {
                 </DialogContent>
             </Dialog>
             
-            <AlertDialog open={isScrapeResultsDialogOpen} onOpenChange={setIsScrapeResultsDialogOpen}>
-                <AlertDialogContent className="max-w-4xl">
+            <Dialog open={isScrapeResultsDialogOpen} onOpenChange={setIsScrapeResultsDialogOpen}>
+                <DialogContent className="max-w-4xl">
                     <AlertDialogHeader>
                         <AlertDialogTitle>Resultados da Busca ({scrapedResults.length} encontrados)</AlertDialogTitle>
                         <AlertDialogDescription>Revise os prospects encontrados e salve na sua lista de prospecção.</AlertDialogDescription>
                     </AlertDialogHeader>
-                    <div className="max-h-96 overflow-y-auto"><pre className="text-xs p-4 bg-muted rounded-md">{JSON.stringify(scrapedResults, null, 2)}</pre></div>
+                    <div className="max-h-96 overflow-y-auto">
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>Nome</TableHead>
+                                    <TableHead>Endereço</TableHead>
+                                    <TableHead>Contato</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                            {scrapedResults.map((prospect, index) => (
+                                <TableRow key={index}>
+                                    <TableCell className="font-medium">{prospect.name}</TableCell>
+                                    <TableCell>{prospect.address}</TableCell>
+                                    <TableCell>{prospect.contact}</TableCell>
+                                </TableRow>
+                            ))}
+                            </TableBody>
+                        </Table>
+                    </div>
                     <AlertDialogFooter>
                         <AlertDialogCancel>Fechar</AlertDialogCancel>
                         <AlertDialogAction onClick={handleSaveAllScraped} disabled={isSavingAll}>
                             {isSavingAll ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Save className="mr-2 h-4 w-4" />} Salvar Todos
                         </AlertDialogAction>
                     </AlertDialogFooter>
-                </AlertDialogContent>
-            </AlertDialog>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }

@@ -211,6 +211,69 @@ export interface Issue {
   resolvedAt?: Timestamp;
 }
 
+// --- Evolution API Types ---
+export interface EvolutionInstance {
+    id: string;
+    name: string;
+    connectionStatus: 'open' | 'close' | 'connecting' | 'connected' | 'disconnected' | 'qrcode' | 'awaiting_qrcode_scan';
+}
+
+export interface EvolutionInstanceCreationResponse {
+    instance: {
+      instanceName: string;
+      hash: string;
+      status: string;
+    };
+    hash: {
+        apikey: string;
+    };
+    qrcode?: {
+        base64: string;
+    };
+}
+
+export interface GetQRCodeResponse {
+    qrcode: {
+        base64: string;
+    };
+    // other properties may exist
+}
+
+export interface Chat {
+  jid: string;
+  name: string;
+  lastMessage?: { // lastMessage can be optional
+      key: {
+          remoteJid: string;
+          fromMe: boolean;
+          id: string;
+      };
+      messageTimestamp: number;
+      message: {
+          conversation: string;
+      };
+  };
+  unreadCount: number;
+  instanceName?: string; // Add instanceName to know which instance the chat belongs to
+}
+
+export interface Message {
+    key: {
+        remoteJid: string;
+        fromMe: boolean;
+        id: string;
+    };
+    message: {
+        conversation?: string;
+        extendedTextMessage?: {
+            text: string;
+        };
+        // Add other message types as needed
+    };
+    messageTimestamp: number;
+    // Other message properties
+}
+
 
 // Re-exporting AI types to be used in the UI
 export type { AdsIACreatorInput };
