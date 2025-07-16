@@ -2,7 +2,7 @@
 'use client';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Briefcase, LayoutDashboard, Users, Folder, Megaphone, Presentation, Settings, Users2, Building, DollarSign, FileText, LogOut, Loader2 } from 'lucide-react';
+import { Briefcase, LayoutDashboard, Users, Folder, Megaphone, Presentation, Settings, Users2, Building, DollarSign, FileText, LogOut, Loader2, ChevronsUpDown, Check, User, Wand2, CheckSquare, AlertTriangle, KeyRound } from 'lucide-react';
 import {
   SidebarProvider,
   Sidebar,
@@ -17,10 +17,132 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from './ui/button';
 import { Skeleton } from './ui/skeleton';
 import { useAuth } from '@/hooks/use-auth';
+import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from './ui/command';
+import { cn } from '@/lib/utils';
+import type { Client } from '@/lib/types';
+
+
+const agencyNav = [
+    { name: 'Dashboard', href: '/', icon: LayoutDashboard },
+    { name: 'Clientes', href: '/clients', icon: Users },
+    { name: 'Propostas', href: '/proposals', icon: FileText },
+    { name: 'Prospecção', href: '/prospects', icon: Briefcase },
+    { name: 'Financeiro', href: '/financials', icon: DollarSign },
+    { name: 'Equipe', href: '/users', icon: Users2 },
+    { name: 'Agência', href: '/agency', icon: Building },
+    { name: 'Relatórios', href: '/reports', icon: Presentation, disabled: true },
+    { name: 'Configurações', href: '/settings', icon: Settings, disabled: true },
+]
+
+const clientNav = (clientId: string) => [
+  { name: 'Contexto', href: `/clients/${clientId}`, icon: FileText },
+  { name: 'Projetos', href: `/clients/${clientId}/projects`, icon: Folder },
+  { name: 'Financeiro', href: `/clients/${clientId}/financials`, icon: DollarSign },
+  { name: 'Ferramentas IA', href: `/clients/${clientId}/tools`, icon: Wand2 },
+  { name: 'Playbooks', href: `/clients/${clientId}/playbooks`, icon: CheckSquare },
+  { name: 'Issues', href: `/clients/${clientId}/issues`, icon: AlertTriangle },
+  { name: 'Acessos', href: `/clients/${clientId}/access`, icon: KeyRound },
+]
+
+function AccountSwitcher() {
+    const { user, clients, viewContext, setViewContext, isLoading } = useAuth();
+    const [open, setOpen] = React.useState(false);
+
+    if (isLoading || !user) {
+        return <Skeleton className="h-10 w-full" />;
+    }
+    
+    const assignedClients = clients.filter(c => user.role === 'agencyAdmin' || (user.assignedClientIds || []).includes(c.id));
+    
+    const getContextName = () => {
+      if (viewContext.type === 'client') {
+        const client = clients.find(c => c.id === viewContext.clientId);
+        return client?.name || 'Cliente';
+      }
+      return 'Painel da Agência';
+    }
+
+    const selectContext = (context: {type: 'agency'} | {type: 'client', client: Client}) => {
+        setViewContext(context);
+        setOpen(false);
+    }
+    
+    if (user.role !== 'agencyAdmin' && assignedClients.length <= 1) {
+      return (
+         <Button
+            variant="outline"
+            role="combobox"
+            aria-expanded={open}
+            className="w-full justify-start"
+            disabled
+        >
+            <div className="flex items-center gap-2 truncate">
+              {assignedClients.length === 1 ? (
+                <>
+                  <Avatar className="w-6 h-6"><AvatarImage src={assignedClients[0].logo} alt={assignedClients[0].name} data-ai-hint="logo company" /><AvatarFallback>{assignedClients[0].name[0]}</AvatarFallback></Avatar>
+                  <span className="truncate">{assignedClients[0].name}</span>
+                </>
+              ) : (
+                <span className="truncate">Nenhum cliente atribuído</span>
+              )}
+            </div>
+        </Button>
+      )
+    }
+
+    return (
+        <Popover open={open} onOpenChange={setOpen}>
+            <PopoverTrigger asChild>
+                <Button variant="outline" role="combobox" aria-expanded={open} className="w-full justify-between">
+                    <div className="flex items-center gap-2 truncate">
+                        {viewContext.type === 'client' ? (
+                          <>
+                           <Avatar className="w-6 h-6"><AvatarImage src={clients.find(c=>c.id === viewContext.clientId)?.logo} data-ai-hint="logo company" /><AvatarFallback>{getContextName()[0]}</AvatarFallback></Avatar>
+                           <span className="truncate">{getContextName()}</span>
+                          </>
+                        ) : (
+                          <>
+                           <Building className="w-5 h-5"/>
+                           <span className="truncate">{getContextName()}</span>
+                          </>
+                        )}
+                    </div>
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-[var(--sidebar-width)] p-0">
+                <Command>
+                    <CommandInput placeholder="Buscar conta..." />
+                    <CommandEmpty>Nenhuma conta encontrada.</CommandEmpty>
+                    <CommandGroup>
+                        <CommandList>
+                            {user.role === 'agencyAdmin' && (
+                                <CommandItem onSelect={() => selectContext({type: 'agency'})}>
+                                    <Building className={cn("mr-2 h-5 w-5", viewContext.type === 'agency' ? "opacity-100" : "opacity-40")} />
+                                    Painel da Agência
+                                    <Check className={cn("ml-auto h-4 w-4", viewContext.type === 'agency' ? "opacity-100" : "opacity-0")} />
+                                </CommandItem>
+                            )}
+                            {assignedClients.map(client => (
+                                <CommandItem key={client.id} onSelect={() => selectContext({ type: 'client', client })}>
+                                    <Avatar className={cn("mr-2 w-6 h-6", viewContext.type === 'client' && viewContext.clientId === client.id ? "opacity-100" : "opacity-70")}><AvatarImage src={client.logo} alt={client.name} data-ai-hint="logo company" /><AvatarFallback>{client.name[0]}</AvatarFallback></Avatar>
+                                    <span className="truncate">{client.name}</span>
+                                    <Check className={cn("ml-auto h-4 w-4", viewContext.type === 'client' && viewContext.clientId === client.id ? "opacity-100" : "opacity-0")} />
+                                </CommandItem>
+                            ))}
+                        </CommandList>
+                    </CommandGroup>
+                </Command>
+            </PopoverContent>
+        </Popover>
+    )
+}
+
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const { user, signOut, isLoading } = useAuth();
+  const { user, signOut, isLoading, viewContext } = useAuth();
 
   const isAuthPage = pathname === '/login' || pathname === '/signup';
 
@@ -35,113 +157,33 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </div>
     );
   }
+  
+  const navigationLinks = viewContext.type === 'client' ? clientNav(viewContext.clientId) : agencyNav;
+  const basePath = viewContext.type === 'client' ? `/clients/${viewContext.clientId}` : '';
+
 
   return (
     <SidebarProvider>
       <Sidebar>
         <SidebarHeader>
-          <div className="flex flex-col">
-             <h1 className="text-base font-medium">Agência Digital</h1>
-             <p className="text-sm text-muted-foreground">Gerenciamento de Clientes</p>
-          </div>
+          <AccountSwitcher />
         </SidebarHeader>
         <SidebarContent>
           <SidebarMenu>
-            <SidebarMenuItem>
-              <Link href="/">
-                <SidebarMenuButton
-                  isActive={pathname === '/'}
-                  tooltip="Dashboard"
-                >
-                  <LayoutDashboard />
-                  <span>Dashboard</span>
-                </SidebarMenuButton>
-              </Link>
-            </SidebarMenuItem>
-            <SidebarMenuItem>
-              <Link href="/clients">
-                <SidebarMenuButton
-                  isActive={pathname.startsWith('/clients')}
-                  tooltip="Clientes"
-                >
-                  <Users />
-                  <span>Clientes</span>
-                </SidebarMenuButton>
-              </Link>
-            </SidebarMenuItem>
-             <SidebarMenuItem>
-                <Link href="/proposals">
-                    <SidebarMenuButton
-                    isActive={pathname.startsWith('/proposals')}
-                    tooltip="Propostas"
-                    >
-                    <FileText />
-                    <span>Propostas</span>
-                    </SidebarMenuButton>
-                </Link>
-            </SidebarMenuItem>
-            <SidebarMenuItem>
-                <Link href="/prospects">
-                    <SidebarMenuButton
-                    isActive={pathname.startsWith('/prospects')}
-                    tooltip="Prospecção"
-                    >
-                    <Briefcase />
-                    <span>Prospecção</span>
-                    </SidebarMenuButton>
-                </Link>
-            </SidebarMenuItem>
-            <SidebarMenuItem>
-              <Link href="/financials">
-                <SidebarMenuButton
-                  isActive={pathname.startsWith('/financials')}
-                  tooltip="Financeiro"
-                >
-                  <DollarSign />
-                  <span>Financeiro</span>
-                </SidebarMenuButton>
-              </Link>
-            </SidebarMenuItem>
-            <SidebarMenuItem>
-              <Link href="/users">
-                <SidebarMenuButton
-                  isActive={pathname.startsWith('/users')}
-                  tooltip="Equipe"
-                >
-                  <Users2 />
-                  <span>Equipe</span>
-                </SidebarMenuButton>
-              </Link>
-            </SidebarMenuItem>
-             <SidebarMenuItem>
-                <Link href="/agency">
-                    <SidebarMenuButton
-                    isActive={pathname.startsWith('/agency')}
-                    tooltip="Agência"
-                    >
-                    <Building />
-                    <span>Agência</span>
-                    </SidebarMenuButton>
-                </Link>
-            </SidebarMenuItem>
-             <SidebarMenuItem>
-              <SidebarMenuButton
-                tooltip="Relatórios"
-                disabled
-              >
-                <Presentation />
-                <span>Relatórios</span>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-             <SidebarMenuItem>
-              <SidebarMenuButton
-                tooltip="Configurações"
-                disabled
-              >
-                <Settings />
-                <span>Configurações</span>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
+            {navigationLinks.map(item => (
+                 <SidebarMenuItem key={item.name}>
+                    <Link href={item.href}>
+                        <SidebarMenuButton
+                        isActive={pathname === item.href || (item.href !== '/' && pathname.startsWith(item.href))}
+                        tooltip={item.name}
+                        disabled={item.disabled}
+                        >
+                        <item.icon />
+                        <span>{item.name}</span>
+                        </SidebarMenuButton>
+                    </Link>
+                </SidebarMenuItem>
+            ))}
           </SidebarMenu>
         </SidebarContent>
         <SidebarFooter className="p-2">

@@ -13,13 +13,18 @@ import {
     signInWithPopup,
     User as FirebaseUser
 } from 'firebase/auth';
-import { doc, getDoc, setDoc, query, where, getDocs, collection, writeBatch, serverTimestamp } from 'firebase/firestore';
-import type { User as AppUser, Invitation } from '@/lib/types';
+import { doc, getDoc, setDoc, query, where, getDocs, collection, writeBatch, serverTimestamp, onSnapshot } from 'firebase/firestore';
+import type { User as AppUser, Invitation, Client } from '@/lib/types';
+
+type ViewContext = { type: 'agency' } | { type: 'client', clientId: string, clientName: string };
 
 interface AuthContextType {
     user: AppUser | null;
     firebaseUser: FirebaseUser | null;
     isLoading: boolean;
+    clients: Client[];
+    viewContext: ViewContext;
+    setViewContext: (context: {type: 'agency'} | {type: 'client', client: Client}) => void;
     signOut: () => void;
     signInWithEmail: (email: string, password: string) => Promise<any>;
     signInWithGoogle: () => Promise<any>;
@@ -34,6 +39,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const [user, setUser] = useState<AppUser | null>(null);
     const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
     const [isLoading, setIsLoading] = useState(true);
+    const [clients, setClients] = useState<Client[]>([]);
+    const [viewContext, setViewContextState] = useState<ViewContext>({ type: 'agency' });
     const router = useRouter();
     const pathname = usePathname();
 
@@ -46,11 +53,19 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 const userDocSnap = await getDoc(userDocRef);
 
                 if (userDocSnap.exists()) {
-                    setUser({ id: userDocSnap.id, ...userDocSnap.data() } as AppUser);
+                    const appUser = { id: userDocSnap.id, ...userDocSnap.data() } as AppUser;
+                    setUser(appUser);
+                    // Set initial context based on user role
+                    if (appUser.role !== 'agencyAdmin' && appUser.assignedClientIds && appUser.assignedClientIds.length > 0) {
+                        const firstClient = clients.find(c => c.id === appUser.assignedClientIds![0]);
+                        if(firstClient) {
+                           setViewContextState({ type: 'client', clientId: firstClient.id, clientName: firstClient.name });
+                        }
+                    } else {
+                        setViewContextState({ type: 'agency' });
+                    }
                 } else {
-                    // Handle case where user is authenticated but not in Firestore
-                    // This could happen on first sign-up
-                    // We let the signUp function handle creating the user doc
+                    // This can happen on first sign-up
                 }
             } else {
                 setFirebaseUser(null);
@@ -58,9 +73,28 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             }
             setIsLoading(false);
         });
+        
+        const clientsQuery = query(collection(db, 'clients'));
+        const unsubscribeClients = onSnapshot(clientsQuery, (snapshot) => {
+            setClients(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Client)));
+        });
 
-        return () => unsubscribe();
+        return () => {
+          unsubscribe();
+          unsubscribeClients();
+        };
     }, []);
+    
+    useEffect(() => {
+      if (user && user.role !== 'agencyAdmin' && user.assignedClientIds && user.assignedClientIds.length > 0) {
+        const firstClientId = user.assignedClientIds[0];
+        const client = clients.find(c => c.id === firstClientId);
+        if (client && viewContext.type === 'agency') { // Only set if not already on a client view
+            setViewContextState({ type: 'client', clientId: client.id, clientName: client.name });
+        }
+      }
+    }, [user, clients, viewContext.type]);
+
 
     useEffect(() => {
         if (isLoading) return;
@@ -73,6 +107,16 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             router.push('/');
         }
     }, [user, isLoading, pathname, router]);
+
+    const setViewContext = (context: {type: 'agency'} | {type: 'client', client: Client}) => {
+        if (context.type === 'agency') {
+            setViewContextState({ type: 'agency' });
+            router.push('/');
+        } else {
+            setViewContextState({ type: 'client', clientId: context.client.id, clientName: context.client.name });
+            router.push(`/clients/${context.client.id}`);
+        }
+    }
 
 
     const createUserInFirestore = async (fbUser: FirebaseUser, name: string, role: AppUser['role'], assignedClientIds?: string[]) => {
@@ -92,7 +136,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const signUp = async (name: string, email: string, password: string) => {
         const normalizedEmail = email.toLowerCase();
         
-        // Special case for agency admin
         if (normalizedEmail === agencyAdminEmail) {
             try {
                 const userCredential = await createUserWithEmailAndPassword(auth, normalizedEmail, password);
@@ -121,7 +164,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         const userCredential = await createUserWithEmailAndPassword(auth, normalizedEmail, password);
         await createUserInFirestore(userCredential.user, name, invitation.role, [invitation.clientId]);
         
-        // Update invitation status
         const batch = writeBatch(db);
         batch.update(invitationDoc.ref, { status: "accepted" });
         await batch.commit();
@@ -131,7 +173,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
     const signInWithEmail = async (email: string, password: string) => {
         await signInWithEmailAndPassword(auth, email, password);
-        // onAuthStateChanged will handle the rest
     };
     
     const signInWithGoogle = async () => {
@@ -143,7 +184,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         const userDocSnap = await getDoc(userDocRef);
         
         if (!userDocSnap.exists()) {
-             // If user doesn't exist in Firestore, check for invitation
              const normalizedEmail = fbUser.email!.toLowerCase();
              
              if (normalizedEmail === agencyAdminEmail) {
@@ -170,7 +210,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
              batch.update(invitationDoc.ref, { status: "accepted" });
              await batch.commit();
         }
-         // onAuthStateChanged will handle the rest
     };
 
     const signOut = async () => {
@@ -180,7 +219,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     };
 
     return (
-        <AuthContext.Provider value={{ user, firebaseUser, isLoading, signOut, signInWithEmail, signInWithGoogle, signUp }}>
+        <AuthContext.Provider value={{ user, firebaseUser, isLoading, clients, viewContext, setViewContext, signOut, signInWithEmail, signInWithGoogle, signUp }}>
             {children}
         </AuthContext.Provider>
     );
