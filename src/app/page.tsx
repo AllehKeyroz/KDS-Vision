@@ -48,13 +48,16 @@ export default function DashboardPage() {
   const [isSaving, setIsSaving] = useState(false);
   
   const [filters, setFilters] = useState({ responsibleId: '', deadline: null as { from?: Date; to?: Date } | null });
-  const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
+  const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
   const [isAppointmentDialogOpen, setIsAppointmentDialogOpen] = useState(false);
   
   const emptyAppointment: AppointmentFormData = { title: '', notes: '', userIds: [], duration: 30, date: undefined, clientId: undefined };
   const [appointmentFormData, setAppointmentFormData] = useState<AppointmentFormData>(emptyAppointment);
 
   useEffect(() => {
+    // Set selectedDate only on the client side to prevent hydration mismatch
+    setSelectedDate(new Date());
+
     const unsubscribes: (() => void)[] = [];
     setIsLoading(true);
 
