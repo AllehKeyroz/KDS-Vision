@@ -44,6 +44,8 @@ const AuthContext = createContext<AuthContextType>({
     signOut: () => {},
 });
 
+const publicRoutes = ['/login', '/signup'];
+
 export function AuthProvider({ children }: { children: ReactNode }) {
     const [authUser, setAuthUser] = useState<FirebaseUser | null>(null);
     const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
@@ -51,51 +53,41 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const router = useRouter();
     const pathname = usePathname();
 
-    const authStateChanged = async (user: FirebaseUser | null) => {
-        setLoading(true);
-        if (!user) {
-            setAuthUser(null);
-            setUserProfile(null);
-            setLoading(false);
-            if (pathname !== '/login' && pathname !== '/signup') {
-                router.push('/login');
+    useEffect(() => {
+        const unsubscribe = onAuthStateChanged(auth, async (user) => {
+            setLoading(true);
+            if (user) {
+                setAuthUser(user);
+                const userDocRef = doc(db, 'users', user.uid);
+                const userDoc = await getDoc(userDocRef);
+                if (userDoc.exists()) {
+                    setUserProfile(userDoc.data() as UserProfile);
+                }
+                if (publicRoutes.includes(pathname)) {
+                    router.push('/');
+                }
+            } else {
+                setAuthUser(null);
+                setUserProfile(null);
+                if (!publicRoutes.includes(pathname)) {
+                    router.push('/login');
+                }
             }
-            return;
-        }
+            setLoading(false);
+        });
 
-        setAuthUser(user);
-        const userDocRef = doc(db, 'users', user.uid);
-        const userDoc = await getDoc(userDocRef);
+        return () => unsubscribe();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [pathname, router]);
 
-        if (userDoc.exists()) {
-            setUserProfile(userDoc.data() as UserProfile);
-        }
-        
-        setLoading(false);
-         if (pathname === '/login' || pathname === '/signup') {
-            router.push('/');
-        }
-    };
-
-    const clear = () => {
-        setAuthUser(null);
-        setUserProfile(null);
-        setLoading(false);
-    };
 
     const signOut = () => {
         firebaseSignOut(auth).then(() => {
-            clear();
+            setAuthUser(null);
+            setUserProfile(null);
             router.push('/login');
         });
     };
-
-    useEffect(() => {
-        const unsubscribe = onAuthStateChanged(auth, authStateChanged);
-        return () => unsubscribe();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [router, pathname]);
-
 
     const signInWithEmail = async (email: string, pass: string) => {
         return signInWithEmailAndPassword(auth, email, pass);
@@ -111,8 +103,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         // Create user profile if it doesn't exist (e.g., first login with Google)
         if (!userDoc.exists()) {
-             // For now, let's make your email an admin, and others default to 'user'.
-            const role = user.email === 'alleh.keyroz@gmail.com' ? 'agencyAdmin' : 'user';
+             const role = user.email === 'alleh.keyroz@gmail.com' ? 'agencyAdmin' : 'user';
             
             await setDoc(userDocRef, {
                 uid: user.uid,
@@ -125,7 +116,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
 
      const signUpWithEmail = async (name: string, email: string, pass: string) => {
-        // Special case for agency admin setup
         if (email.toLowerCase() === 'alleh.keyroz@gmail.com') {
              const userCredential = await createUserWithEmailAndPassword(auth, email, pass);
              const user = userCredential.user;
@@ -135,7 +125,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                  name,
                  email,
                  role: 'agencyAdmin',
-                 costPerHour: 150, // Default cost for admin
+                 costPerHour: 150, 
                  avatar: `https://placehold.co/64x64/EBF4FF/2E9AFE.png?text=${name[0] || 'A'}`,
                  createdAt: serverTimestamp(),
              });
@@ -143,9 +133,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
              return;
         }
         
-        // This is a placeholder for the invitation flow
-        // In a real scenario, you'd check against an 'invitations' collection
-        // For now, we'll throw an error if it's not the admin email
         throw new Error('invitation-not-found');
     };
 

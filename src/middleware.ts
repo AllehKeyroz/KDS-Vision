@@ -14,8 +14,8 @@ export function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL('/', request.url))
   }
 
-  // If user is not authenticated and tries to access protected pages, redirect to login
-  if (!token && protectedRoutes.some(path => pathname.startsWith(path))) {
+  // If user is not authenticated and tries to access a protected page, redirect to login
+  if (!token && protectedRoutes.find(p => pathname.startsWith(p) && (p !== '/' || pathname === '/'))) {
     return NextResponse.redirect(new URL('/login', request.url))
   }
   
