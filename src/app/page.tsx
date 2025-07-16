@@ -542,7 +542,7 @@ export default function DashboardPage() {
                         }}
                     />
                     <div className="mt-4 space-y-2">
-                        <h4 className="font-semibold">Compromissos para {selectedDate ? format(selectedDate, 'dd/MM/yyyy') : '...'}:</h4>
+                         <h4 className="font-semibold">Compromissos para {selectedDate ? format(selectedDate, 'dd/MM/yyyy', { locale: ptBR }) : '...'}:</h4>
                         {dailyAppointments.length > 0 ? (
                             <ScrollArea className="h-40">
                             {dailyAppointments.map(app => (

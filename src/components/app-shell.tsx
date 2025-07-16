@@ -15,27 +15,17 @@ import {
 } from '@/components/ui/sidebar';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from './ui/button';
-import { useAuth } from '@/hooks/use-auth';
 import { Skeleton } from './ui/skeleton';
+
+// Mock user for UI display purposes since auth is removed.
+const mockUser = {
+    displayName: 'Admin da Agência',
+    email: 'admin@agency.com',
+    photoURL: ''
+};
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const { authUser, loading, signOut } = useAuth();
-
-  if (loading) {
-     return (
-        <div className="flex min-h-screen items-center justify-center bg-background">
-            <Loader2 className="h-12 w-12 animate-spin text-primary" />
-        </div>
-    );
-  }
-
-  // If the user is not authenticated, the useAuth hook will redirect them.
-  // We can render the children directly (which will be the login/signup page).
-  if (!authUser) {
-    return <>{children}</>;
-  }
-
 
   return (
     <SidebarProvider>
@@ -149,17 +139,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <div className="p-2 rounded-lg bg-secondary/50 flex flex-col gap-2">
                 <div className="flex items-center gap-2">
                      <Avatar className="h-9 w-9">
-                        <AvatarImage src={authUser.photoURL ?? ''} alt={authUser.displayName || ''} data-ai-hint="avatar person" />
-                        <AvatarFallback>{authUser.displayName?.[0] || authUser.email?.[0]}</AvatarFallback>
+                        <AvatarImage src={mockUser.photoURL ?? ''} alt={mockUser.displayName || ''} data-ai-hint="avatar person" />
+                        <AvatarFallback>{mockUser.displayName?.[0] || mockUser.email?.[0]}</AvatarFallback>
                     </Avatar>
                     <div className="flex flex-col truncate">
-                        <p className="font-semibold text-sm truncate">{authUser.displayName || 'Usuário'}</p>
-                        <p className="text-xs text-muted-foreground truncate">{authUser.email}</p>
+                        <p className="font-semibold text-sm truncate">{mockUser.displayName || 'Usuário'}</p>
+                        <p className="text-xs text-muted-foreground truncate">{mockUser.email}</p>
                     </div>
                 </div>
-                 <Button variant="ghost" size="sm" className="w-full justify-start" onClick={signOut}>
-                    <LogOut className="mr-2 h-4 w-4" /> Sair
-                </Button>
             </div>
         </SidebarFooter>
       </Sidebar>
