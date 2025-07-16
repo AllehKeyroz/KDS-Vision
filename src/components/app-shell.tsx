@@ -41,7 +41,7 @@ const clientNav = (clientId: string) => [
   { name: 'Projetos', href: `/clients/${clientId}/projects`, icon: Folder },
   { name: 'Financeiro', href: `/clients/${clientId}/financials`, icon: DollarSign },
   { name: 'Ferramentas IA', href: `/clients/${clientId}/tools`, icon: Wand2 },
-  { name: 'Playbooks', href: `/clients/${clientId}/playbooks`, icon: CheckSquare },
+  { name: 'Processos', href: `/clients/${clientId}/processos`, icon: CheckSquare },
   { name: 'Issues', href: `/clients/${clientId}/issues`, icon: AlertTriangle },
   { name: 'Acessos', href: `/clients/${clientId}/access`, icon: KeyRound },
 ]
