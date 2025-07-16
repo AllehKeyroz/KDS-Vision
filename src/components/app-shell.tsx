@@ -1,5 +1,6 @@
 
 'use client';
+import * as React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Briefcase, LayoutDashboard, Users, Folder, Megaphone, Presentation, Settings, Users2, Building, DollarSign, FileText, LogOut, Loader2, ChevronsUpDown, Check, User, Wand2, CheckSquare, AlertTriangle, KeyRound } from 'lucide-react';
@@ -159,7 +160,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }
   
   const navigationLinks = viewContext.type === 'client' ? clientNav(viewContext.clientId) : agencyNav;
-  const basePath = viewContext.type === 'client' ? `/clients/${viewContext.clientId}` : '';
 
 
   return (
@@ -170,7 +170,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </SidebarHeader>
         <SidebarContent>
           <SidebarMenu>
-            {navigationLinks.map(item => (
+            {navigationLinks.map(item => {
+                 const finalHref = viewContext.type === 'agency' ? item.href : item.href;
+                 const isActive = item.href === '/' ? pathname === '/' : pathname.startsWith(finalHref) && finalHref !== '/';
+
+                return (
                  <SidebarMenuItem key={item.name}>
                     <Link href={item.href}>
                         <SidebarMenuButton
@@ -183,7 +187,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                         </SidebarMenuButton>
                     </Link>
                 </SidebarMenuItem>
-            ))}
+            )})}
           </SidebarMenu>
         </SidebarContent>
         <SidebarFooter className="p-2">
