@@ -171,14 +171,29 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <SidebarContent>
           <SidebarMenu>
             {navigationLinks.map(item => {
-                 const finalHref = viewContext.type === 'agency' ? item.href : item.href;
-                 const isActive = item.href === '/' ? pathname === '/' : pathname.startsWith(finalHref) && finalHref !== '/';
-
+                 const isActive = item.href === '/' ? pathname === '/' : (pathname === item.href || (item.href !== '/' && pathname.startsWith(item.href)));
+                 if (viewContext.type === 'client' && item.href === `/clients/${viewContext.clientId}`) {
+                    const isActiveClientRoot = pathname === item.href;
+                    return (
+                        <SidebarMenuItem key={item.name}>
+                           <Link href={item.href}>
+                               <SidebarMenuButton
+                               isActive={isActiveClientRoot}
+                               tooltip={item.name}
+                               disabled={item.disabled}
+                               >
+                               <item.icon />
+                               <span>{item.name}</span>
+                               </SidebarMenuButton>
+                           </Link>
+                       </SidebarMenuItem>
+                    )
+                 }
                 return (
                  <SidebarMenuItem key={item.name}>
                     <Link href={item.href}>
                         <SidebarMenuButton
-                        isActive={pathname === item.href || (item.href !== '/' && pathname.startsWith(item.href))}
+                        isActive={isActive}
                         tooltip={item.name}
                         disabled={item.disabled}
                         >
