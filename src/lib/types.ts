@@ -1,4 +1,5 @@
 
+
 import type { AdsIACreatorInput, AdsIACreatorOutput as AdsOutput } from "@/ai/flows/ads-ia-creator";
 import type { Timestamp } from "firebase/firestore";
 
@@ -119,9 +120,20 @@ export interface User {
   id: string;
   name: string;
   email: string;
-  role: 'Admin' | 'Gestor' | 'Analista';
+  role: 'agencyAdmin' | 'clientAdmin' | 'user';
   avatar: string;
   costPerHour?: number;
+  assignedClientIds?: string[];
+}
+
+export interface Invitation {
+  id: string;
+  email: string;
+  clientId: string;
+  role: 'clientAdmin' | 'user';
+  status: 'pending' | 'accepted';
+  createdAt: Timestamp;
+  invitedBy: string;
 }
 
 export interface FinancialTransaction {

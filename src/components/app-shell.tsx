@@ -16,16 +16,25 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from './ui/button';
 import { Skeleton } from './ui/skeleton';
-
-// Mock user for UI display purposes since auth is removed.
-const mockUser = {
-    displayName: 'Admin da Agência',
-    email: 'admin@agency.com',
-    photoURL: ''
-};
+import { useAuth } from '@/hooks/use-auth';
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const { user, signOut, isLoading } = useAuth();
+
+  const isAuthPage = pathname === '/login' || pathname === '/signup';
+
+  if (isAuthPage) {
+    return <>{children}</>;
+  }
+  
+  if (isLoading) {
+    return (
+        <div className="flex items-center justify-center h-screen">
+            <Loader2 className="w-16 h-16 animate-spin text-primary"/>
+        </div>
+    );
+  }
 
   return (
     <SidebarProvider>
@@ -137,16 +146,31 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </SidebarContent>
         <SidebarFooter className="p-2">
             <div className="p-2 rounded-lg bg-secondary/50 flex flex-col gap-2">
-                <div className="flex items-center gap-2">
-                     <Avatar className="h-9 w-9">
-                        <AvatarImage src={mockUser.photoURL ?? ''} alt={mockUser.displayName || ''} data-ai-hint="avatar person" />
-                        <AvatarFallback>{mockUser.displayName?.[0] || mockUser.email?.[0]}</AvatarFallback>
-                    </Avatar>
-                    <div className="flex flex-col truncate">
-                        <p className="font-semibold text-sm truncate">{mockUser.displayName || 'Usuário'}</p>
-                        <p className="text-xs text-muted-foreground truncate">{mockUser.email}</p>
+                {user ? (
+                    <div className="flex items-center justify-between">
+                         <div className="flex items-center gap-2">
+                            <Avatar className="h-9 w-9">
+                                <AvatarImage src={user.avatar ?? ''} alt={user.name || ''} data-ai-hint="avatar person" />
+                                <AvatarFallback>{user.name?.[0] || user.email?.[0]}</AvatarFallback>
+                            </Avatar>
+                            <div className="flex flex-col truncate">
+                                <p className="font-semibold text-sm truncate">{user.name || 'Usuário'}</p>
+                                <p className="text-xs text-muted-foreground truncate">{user.email}</p>
+                            </div>
+                        </div>
+                        <Button variant="ghost" size="icon" onClick={signOut} className="h-8 w-8 text-muted-foreground">
+                            <LogOut className="h-4 w-4" />
+                        </Button>
                     </div>
-                </div>
+                ) : (
+                    <div className="flex items-center gap-2">
+                        <Skeleton className="h-9 w-9 rounded-full" />
+                        <div className="flex flex-col gap-1">
+                            <Skeleton className="h-4 w-20" />
+                            <Skeleton className="h-3 w-24" />
+                        </div>
+                    </div>
+                )}
             </div>
         </SidebarFooter>
       </Sidebar>
