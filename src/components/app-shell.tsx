@@ -2,7 +2,7 @@
 'use client';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Briefcase, LayoutDashboard, Users, Folder, Megaphone, Presentation, Settings, Users2, Building, DollarSign, FileText, LogOut } from 'lucide-react';
+import { Briefcase, LayoutDashboard, Users, Folder, Megaphone, Presentation, Settings, Users2, Building, DollarSign, FileText, LogOut, Loader2 } from 'lucide-react';
 import {
   SidebarProvider,
   Sidebar,
@@ -24,33 +24,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   if (loading) {
      return (
-      <div className="flex min-h-svh">
-        <div className="hidden md:block p-2">
-           <div className="bg-card/50 p-2 rounded-lg flex flex-col h-full w-[240px]">
-              <div className="p-2 space-y-2">
-                <Skeleton className="h-8 w-full" />
-                <Skeleton className="h-4 w-3/4" />
-              </div>
-               <div className="flex-1 p-2 space-y-2">
-                <Skeleton className="h-8 w-full" />
-                <Skeleton className="h-8 w-full" />
-                <Skeleton className="h-8 w-full" />
-                <Skeleton className="h-8 w-full" />
-              </div>
-              <div className="p-2">
-                 <Skeleton className="h-12 w-full" />
-              </div>
-           </div>
+        <div className="flex min-h-screen items-center justify-center bg-background">
+            <Loader2 className="h-12 w-12 animate-spin text-primary" />
         </div>
-        <main className="flex-1 p-4 sm:p-6 lg:p-8">
-            <Skeleton className="h-full w-full" />
-        </main>
-      </div>
     );
   }
 
+  // If the user is not authenticated, the useAuth hook will redirect them.
+  // We can render the children directly (which will be the login/signup page).
   if (!authUser) {
-    // This should be handled by middleware, but as a fallback:
     return <>{children}</>;
   }
 
