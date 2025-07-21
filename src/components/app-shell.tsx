@@ -29,7 +29,6 @@ const agencyNav = [
     { name: 'Dashboard', href: '/', icon: LayoutDashboard },
     { name: 'Atendimento', href: '/atendimento', icon: MessageSquare },
     { name: 'Clientes', href: '/clients', icon: Users },
-    { name: 'Propostas', href: '/proposals', icon: FileText },
     { name: 'Prospecção', href: '/prospects', icon: Briefcase },
     { name: 'Financeiro', href: '/financials', icon: DollarSign },
     { name: 'Equipe', href: '/users', icon: Users2 },
