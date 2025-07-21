@@ -52,29 +52,32 @@ const prospectScraperFlow = ai.defineFlow(
   async ({ query, limit }) => {
     const apiKey = await getOutscraperApiKey();
     
-    const url = new URL('https://api.outscraper.com/maps/search');
-    url.searchParams.append('query', query);
+    // The query should be an array of search terms
+    const url = new URL('https://api.outscraper.com/maps/search-v2');
+    url.searchParams.append('query', JSON.stringify([query]));
     url.searchParams.append('limit', String(limit));
     url.searchParams.append('async', 'false'); // Use synchronous call for immediate results
 
     try {
         const response = await fetch(url.toString(), {
+            method: 'GET',
             headers: {
                 'X-API-KEY': apiKey
             }
         });
-        const result = await response.json();
 
-        if (response.status !== 200 || !result.data) {
-             throw new Error(`Outscraper API error: ${result.message || 'An error occurred.'}`);
+        const result = await response.json();
+        
+        if (response.status !== 200 || !result.data || !Array.isArray(result.data)) {
+             throw new Error(`Outscraper API error: ${result.message || 'An error occurred or invalid data format returned.'}`);
         }
 
-        // The data is nested in result.data[0]
+        // The data is an array of results, potentially nested if multiple queries were sent.
         const businesses = (result.data[0] || []).map((item: any) => ({
-            name: item.name || 'N/A',
+            name: item.name || item.query || 'N/A', // CORRECTED: Prioritize the actual business name
             address: item.full_address || 'N/A',
             rating: item.rating || undefined,
-            contact: item.website || item.phone_number || 'N/A', 
+            contact: item.site_url || item.phone || 'N/A', 
         }));
         
         return businesses;

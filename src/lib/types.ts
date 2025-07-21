@@ -215,6 +215,14 @@ export interface Issue {
   resolvedAt?: Timestamp;
 }
 
+export interface WhatsappTemplate {
+  id: string;
+  title: string;
+  message: string;
+  isDefault: boolean;
+  createdAt?: Timestamp;
+}
+
 // --- Evolution API Types ---
 export interface EvolutionInstance {
   id: string;

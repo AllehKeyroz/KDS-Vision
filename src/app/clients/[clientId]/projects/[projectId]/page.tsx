@@ -11,7 +11,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Progress } from '@/components/ui/progress';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
-import { PlusCircle, Loader2, Trash2, GripVertical, Check, X, Pencil, CheckCircle2, ArrowLeft, CalendarIcon, Filter, User, Clock, DollarSign, BarChart2, ChevronsUpDown, Flame, MessageSquare, Eye, EyeOff, CornerDownRight, Plus, Timer } from 'lucide-react';
+import { PlusCircle, Loader2, Trash2, GripVertical, Check, X, Pencil, CheckCircle2, ArrowLeft, CalendarIcon, Filter, User, Clock, DollarSign, BarChart2, ChevronsUpDown, Flame, MessageSquare, Eye, EyeOff, CornerDownRight, Plus, Timer, ChevronRight } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { db } from '@/lib/firebase';
 import { collection, onSnapshot, doc, updateDoc, arrayUnion, Timestamp } from 'firebase/firestore';
@@ -44,7 +44,7 @@ const AddNewTaskInput = ({
     setNewTask,
     users,
     handleAddTask,
-    setIsAddingSubTask,
+    onCancel,
 }: {
     sectionId: string,
     parentId?: string,
@@ -52,7 +52,7 @@ const AddNewTaskInput = ({
     setNewTask: React.Dispatch<React.SetStateAction<{ [key: string]: NewTaskState }>>,
     users: AppUser[],
     handleAddTask: (sectionId: string, parentId?: string) => void,
-    setIsAddingSubTask: (parentId: string | null) => void,
+    onCancel?: () => void,
 }) => (
     <div className={cn("flex items-start md:items-center gap-2 pt-4 flex-col md:flex-row", parentId && "ml-8 pl-6 border-l-2")}>
         <Input 
@@ -117,7 +117,7 @@ const AddNewTaskInput = ({
             </PopoverContent>
         </Popover>
         <Button size="sm" onClick={() => handleAddTask(sectionId, parentId)}>Adicionar</Button>
-        {parentId && <Button size="icon" variant="ghost" onClick={() => setIsAddingSubTask(null)}><X className="h-4 w-4"/></Button>}
+        {onCancel && <Button size="icon" variant="ghost" onClick={onCancel}><X className="h-4 w-4"/></Button>}
     </div>
 );
 
@@ -125,28 +125,49 @@ const AddNewTaskInput = ({
 // Recursive Task Component
 const TaskItem: React.FC<{ 
     task: Task; 
+    sectionId: string;
     allTasks: Task[];
     level: number;
     users: AppUser[];
+    isAddingSubTask: string | null;
+    newTask: { [key: string]: NewTaskState };
     onToggle: (taskId: string, completed: boolean) => void;
     onDelete: (taskId: string) => void;
     onEdit: (task: Task) => void;
     onLogTime: (taskId: string, currentLogs: LoggedTime[] | undefined) => void;
     onAddSubTask: (parentId: string) => void;
-}> = ({ task, allTasks, level, users, onToggle, onDelete, onEdit, onLogTime, onAddSubTask }) => {
+    setNewTask: React.Dispatch<React.SetStateAction<{ [key: string]: NewTaskState }>>;
+    handleAddTask: (sectionId: string, parentId?: string) => void;
+    cancelAddSubTask: () => void;
+}> = ({ task, sectionId, allTasks, level, users, isAddingSubTask, newTask, onToggle, onDelete, onEdit, onLogTime, onAddSubTask, setNewTask, handleAddTask, cancelAddSubTask }) => {
     const subTasks = allTasks.filter(sub => sub.parentId === task.id).sort((a,b) => (priorityOrder[a.priority] || 3) - (priorityOrder[b.priority] || 3));
     const totalHoursForTask = (t: Task) => (t.timeLogs || []).reduce((acc, log) => acc + log.hours, 0);
     const priorityBadgeVariant = { 'Alta': 'destructive', 'Média': 'secondary', 'Baixa': 'outline' } as const;
+    const hasSubtasks = subTasks.length > 0;
+    const [isOpen, setIsOpen] = useState(true);
+
+    const handleAddClick = (parentId: string) => {
+        setIsOpen(true);
+        onAddSubTask(parentId);
+    };
 
     return (
-        <Collapsible defaultOpen>
-            <div className={cn("flex items-center gap-2 group p-2 rounded-md hover:bg-secondary/20", level > 0 && "ml-4 border-l-2 pl-4 border-dashed")}>
-                <Checkbox id={task.id} checked={task.completed} onCheckedChange={(checked) => onToggle(task.id, !!checked)} />
-                <CollapsibleTrigger asChild>
+        <Collapsible open={isOpen} onOpenChange={setIsOpen}>
+            <div className={cn("flex items-start gap-2 group p-2 rounded-md hover:bg-secondary/20", level > 0 && "ml-4 border-l-2 pl-4 border-dashed")}>
+                <div className="flex items-center gap-2 flex-1">
+                    {hasSubtasks || isAddingSubTask === task.id ? (
+                        <CollapsibleTrigger asChild>
+                             <Button variant="ghost" size="icon" className="h-6 w-6 [&[data-state=open]>svg]:rotate-90">
+                                <ChevronRight className="h-4 w-4 transition-transform" />
+                            </Button>
+                        </CollapsibleTrigger>
+                    ) : <div className="w-6 h-6"/> /* Spacer */}
+                    
+                    <Checkbox id={task.id} checked={task.completed} onCheckedChange={(checked) => onToggle(task.id, !!checked)} />
                     <label htmlFor={task.id} className={cn('flex-1 text-sm cursor-pointer', task.completed && 'line-through text-muted-foreground')}>
                         {task.text}
                     </label>
-                </CollapsibleTrigger>
+                </div>
                 
                 <div className="flex items-center gap-2 ml-auto">
                     {task.description && <Badge variant="outline" className="hidden sm:flex items-center gap-1"><MessageSquare size={12}/>Nota</Badge>}
@@ -165,7 +186,7 @@ const TaskItem: React.FC<{
                     {totalHoursForTask(task) > 0 && <Badge variant="secondary" className="flex items-center gap-1"><Clock size={12}/>{totalHoursForTask(task)}h</Badge>}
                     
                     <div className="opacity-0 group-hover:opacity-100 transition-opacity">
-                         <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => onAddSubTask(task.id)}><Plus className="h-3 w-3"/></Button>
+                         <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleAddClick(task.id)}><Plus className="h-3 w-3"/></Button>
                         <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => onLogTime(task.id, task.timeLogs)}><Clock className="h-3 w-3"/></Button>
                         <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => onEdit(task)}><Pencil className="h-3 w-3"/></Button>
                         <AlertDialog>
@@ -181,13 +202,24 @@ const TaskItem: React.FC<{
             </div>
              <CollapsibleContent className="pl-4">
                 {task.description && (
-                    <div className="ml-8 pl-4 py-2 border-l-2 border-dashed border-border text-sm text-muted-foreground whitespace-pre-wrap">
+                     <div className="ml-14 pl-2 py-2 border-l-2 border-dashed border-border text-sm text-muted-foreground whitespace-pre-wrap">
                         {task.description}
                     </div>
                 )}
                 {subTasks.map(subTask => (
-                    <TaskItem key={subTask.id} task={subTask} allTasks={allTasks} level={level + 1} users={users} onToggle={onToggle} onDelete={onDelete} onEdit={onEdit} onLogTime={onLogTime} onAddSubTask={onAddSubTask} />
+                    <TaskItem key={subTask.id} task={subTask} sectionId={sectionId} allTasks={allTasks} level={level + 1} users={users} onToggle={onToggle} onDelete={onDelete} onEdit={onEdit} onLogTime={onLogTime} onAddSubTask={onAddSubTask} isAddingSubTask={isAddingSubTask} newTask={newTask} setNewTask={setNewTask} handleAddTask={handleAddTask} cancelAddSubTask={cancelAddSubTask}/>
                 ))}
+                 {isAddingSubTask === task.id && (
+                    <AddNewTaskInput 
+                        sectionId={sectionId} 
+                        parentId={isAddingSubTask} 
+                        newTask={newTask}
+                        setNewTask={setNewTask}
+                        users={users}
+                        handleAddTask={handleAddTask}
+                        onCancel={cancelAddSubTask}
+                    />
+                )}
             </CollapsibleContent>
         </Collapsible>
     )
@@ -363,7 +395,7 @@ export default function ProjectDetailPage() {
         });
 
         await updateDoc(projectDocRef, { sections: updatedSections });
-        setNewTask(prev => ({ ...prev, [sectionId]: { text: "", responsibleIds: [], priority: 'Média', parentId: parentId }}));
+        setNewTask(prev => ({ ...prev, [sectionId]: { text: "", responsibleIds: [], priority: 'Média' }}));
         if(parentId) setIsAddingSubTask(null);
     };
     
@@ -427,6 +459,11 @@ export default function ProjectDetailPage() {
     const handleAddNewSubTask = (parentId: string) => {
         setIsAddingSubTask(parentId);
     }
+    
+    const cancelAddSubTask = () => {
+        setIsAddingSubTask(null);
+    }
+
 
     const handleLogTime = async (event: React.FormEvent<HTMLFormElement>) => {
         event.preventDefault();
@@ -682,10 +719,11 @@ export default function ProjectDetailPage() {
                                 </div>
                             </div>
                             <AccordionContent className="p-4 pt-0 space-y-2">
-                                {(section.tasks || []).filter(t => !t.parentId).map(task => (
+                                {(section.tasks || []).filter(t => !t.parentId).sort((a, b) => (priorityOrder[a.priority] || 3) - (priorityOrder[b.priority] || 3)).map(task => (
                                     <TaskItem 
                                         key={task.id} 
                                         task={task} 
+                                        sectionId={section.id}
                                         allTasks={section.tasks}
                                         level={0}
                                         users={users}
@@ -694,27 +732,21 @@ export default function ProjectDetailPage() {
                                         onEdit={setEditingTask}
                                         onLogTime={handleOpenTimeLogDialog}
                                         onAddSubTask={handleAddNewSubTask}
+                                        isAddingSubTask={isAddingSubTask}
+                                        newTask={newTask}
+                                        setNewTask={setNewTask}
+                                        handleAddTask={handleAddTask}
+                                        cancelAddSubTask={cancelAddSubTask}
                                     />
                                 ))}
 
-                                {isAddingSubTask && (project.sections || []).find(s => s.tasks.some(t => t.id === isAddingSubTask))?.id === section.id ? (
-                                    <AddNewTaskInput 
-                                        sectionId={section.id} 
-                                        parentId={isAddingSubTask} 
-                                        newTask={newTask}
-                                        setNewTask={setNewTask}
-                                        users={users}
-                                        handleAddTask={handleAddTask}
-                                        setIsAddingSubTask={setIsAddingSubTask}
-                                    />
-                                ) : (
+                                {isAddingSubTask === null && (
                                     <AddNewTaskInput 
                                         sectionId={section.id}
                                         newTask={newTask}
                                         setNewTask={setNewTask}
                                         users={users}
                                         handleAddTask={handleAddTask}
-                                        setIsAddingSubTask={setIsAddingSubTask}
                                     />
                                 )}
                             </AccordionContent>
