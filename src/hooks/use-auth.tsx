@@ -114,7 +114,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             router.push('/');
         } else {
             setViewContextState({ type: 'client', clientId: context.client.id, clientName: context.client.name });
-            router.push(`/clients/${context.client.id}`);
+            router.push(`/clients/${context.client.id}/projects`);
         }
     }
 

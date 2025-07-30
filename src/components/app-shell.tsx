@@ -3,7 +3,7 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Briefcase, LayoutDashboard, Users, Folder, Megaphone, Presentation, Settings, Users2, Building, DollarSign, FileText, LogOut, Loader2, ChevronsUpDown, Check, User, Wand2, CheckSquare, AlertTriangle, KeyRound, Link as LinkIcon, Puzzle, MessageSquare } from 'lucide-react';
+import { Briefcase, LayoutDashboard, Users, Folder, Megaphone, Presentation, Settings, Users2, Building, DollarSign, FileText, LogOut, Loader2, ChevronsUpDown, Check, User, Wand2, CheckSquare, AlertTriangle, KeyRound, Link as LinkIcon, Puzzle, MessageSquare, FolderKanban, Notebook } from 'lucide-react';
 import {
   SidebarProvider,
   Sidebar,
@@ -23,12 +23,14 @@ import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from './ui/command';
 import { cn } from '@/lib/utils';
 import type { Client } from '@/lib/types';
+import { ThemeToggle } from './theme-toggle';
 
 
 const agencyNav = [
     { name: 'Dashboard', href: '/', icon: LayoutDashboard },
     { name: 'Atendimento', href: '/atendimento', icon: MessageSquare },
     { name: 'Clientes', href: '/clients', icon: Users },
+    { name: 'Projetos', href: '/projects', icon: FolderKanban },
     { name: 'Prospecção', href: '/prospects', icon: Briefcase },
     { name: 'Financeiro', href: '/financials', icon: DollarSign },
     { name: 'Equipe', href: '/users', icon: Users2 },
@@ -36,18 +38,18 @@ const agencyNav = [
     { name: 'Links Úteis', href: '/agency/links', icon: LinkIcon },
     { name: 'Processos', href: '/agency/processos', icon: CheckSquare },
     { name: 'Chaves de API', href: '/agency/keys', icon: Puzzle },
-    { name: 'Relatórios', href: '/reports', icon: Presentation, disabled: true },
+    { name: 'Relatórios', href: '/reports', icon: Presentation },
     { name: 'Configurações', href: '/settings', icon: Settings, disabled: true },
 ]
 
 const clientNav = (clientId: string) => [
-  { name: 'Contexto', href: `/clients/${clientId}`, icon: FileText },
   { name: 'Projetos', href: `/clients/${clientId}/projects`, icon: Folder },
-  { name: 'Financeiro', href: `/clients/${clientId}/financials`, icon: DollarSign },
   { name: 'Ferramentas IA', href: `/clients/${clientId}/tools`, icon: Wand2 },
-  { name: 'Processos', href: `/clients/${clientId}/processos`, icon: CheckSquare },
+  { name: 'Playbooks', href: `/clients/${clientId}/playbooks`, icon: CheckSquare },
+  { name: 'Anotações', href: `/clients/${clientId}/notes`, icon: Notebook },
   { name: 'Issues', href: `/clients/${clientId}/issues`, icon: AlertTriangle },
   { name: 'Acessos', href: `/clients/${clientId}/access`, icon: KeyRound },
+  { name: 'Contexto', href: `/clients/${clientId}`, icon: FileText },
 ]
 
 function AccountSwitcher() {
@@ -210,6 +212,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </SidebarMenu>
         </SidebarContent>
         <SidebarFooter className="p-2">
+            <div className="flex items-center justify-between p-2 rounded-lg bg-secondary/50">
+                 <ThemeToggle />
+                 <Button variant="ghost" size="icon" onClick={signOut} className="h-8 w-8 text-muted-foreground">
+                    <LogOut className="h-4 w-4" />
+                </Button>
+            </div>
             <div className="p-2 rounded-lg bg-secondary/50 flex flex-col gap-2">
                 {user ? (
                     <div className="flex items-center justify-between">
@@ -223,9 +231,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                                 <p className="text-xs text-muted-foreground truncate">{user.email}</p>
                             </div>
                         </div>
-                        <Button variant="ghost" size="icon" onClick={signOut} className="h-8 w-8 text-muted-foreground">
-                            <LogOut className="h-4 w-4" />
-                        </Button>
                     </div>
                 ) : (
                     <div className="flex items-center gap-2">

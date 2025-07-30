@@ -28,6 +28,21 @@ export type Proposal = {
     validityBenefit?: string;
 };
 
+export type FaqItem = {
+    id: string;
+    question: string;
+    answer: string;
+};
+
+export type ClientContext = {
+    company: { history: string; mission: string; vision: string; values: string; team: string };
+    branding: { toneOfVoice: string; visualIdentity: string; differentials: string };
+    products: { mainProducts: string; productDetails: string; pricing: string };
+    marketing: { targetAudience: string; pastCampaigns: string; plannedInvestment: string; promotions: string };
+    faq: FaqItem[];
+};
+
+
 export type Client = {
   id: string;
   name: string;
@@ -47,6 +62,7 @@ export type Client = {
     zip?: string;
   };
   additionalFields?: Record<string, any>;
+  context?: ClientContext;
 };
 
 export type ClientAccess = {
@@ -183,6 +199,13 @@ export interface Appointment {
   userIds: string[];
   clientId?: string;
   notes?: string;
+}
+
+export interface Note {
+  id: string;
+  title: string;
+  content: string;
+  createdAt: Timestamp;
 }
 
 export interface PlaybookItem {
