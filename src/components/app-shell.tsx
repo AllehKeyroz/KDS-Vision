@@ -28,18 +28,14 @@ import { ThemeToggle } from './theme-toggle';
 
 const agencyNav = [
     { name: 'Dashboard', href: '/', icon: LayoutDashboard },
-    { name: 'Atendimento', href: '/atendimento', icon: MessageSquare },
     { name: 'Clientes', href: '/clients', icon: Users },
     { name: 'Projetos', href: '/projects', icon: FolderKanban },
     { name: 'Prospecção', href: '/prospects', icon: Briefcase },
     { name: 'Financeiro', href: '/financials', icon: DollarSign },
     { name: 'Equipe', href: '/users', icon: Users2 },
-    { name: 'Acessos Internos', href: '/agency/access', icon: KeyRound },
-    { name: 'Links Úteis', href: '/agency/links', icon: LinkIcon },
     { name: 'Processos', href: '/agency/processos', icon: CheckSquare },
-    { name: 'Chaves de API', href: '/agency/keys', icon: Puzzle },
-    { name: 'Relatórios', href: '/reports', icon: Presentation },
-    { name: 'Configurações', href: '/settings', icon: Settings, disabled: true },
+    { name: 'Acessos e Links', href: '/agency/access', icon: KeyRound },
+    { name: 'Configurações', href: '/settings', icon: Settings },
 ]
 
 const clientNav = (clientId: string) => [

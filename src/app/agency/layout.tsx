@@ -9,8 +9,8 @@ import { cn } from '@/lib/utils';
 const tabs = [
   { name: 'Acessos Internos', href: '/agency/access', icon: KeyRound },
   { name: 'Links Úteis', href: '/agency/links', icon: LinkIcon },
-  { name: 'Processos', href: '/agency/processos', icon: CheckSquare },
-  { name: 'Chaves de API', href: '/agency/keys', icon: Puzzle },
+  // { name: 'Processos', href: '/agency/processos', icon: CheckSquare }, // Removido daqui
+  // { name: 'Chaves de API', href: '/agency/keys', icon: Puzzle }, // Removido daqui
   // Future tabs can be added here
   // { name: 'Configurações', href: '/agency/settings', icon: Settings },
 ];
@@ -18,11 +18,26 @@ const tabs = [
 export default function AgencyLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
 
+  // Se a rota for /agency/processos, não mostramos o layout com abas
+  if (pathname.startsWith('/agency/processos')) {
+    return (
+      <div className="space-y-6">
+         <div>
+            <h1 className="text-3xl font-bold tracking-tight font-headline">Processos da Agência</h1>
+            <p className="text-muted-foreground">Crie e gerencie seus templates de processos e checklists.</p>
+        </div>
+        <div className="mt-6">
+            {children}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight font-headline">Painel da Agência</h1>
-        <p className="text-muted-foreground">Gerencie as informações e configurações internas da sua agência.</p>
+        <h1 className="text-3xl font-bold tracking-tight font-headline">Acessos e Links</h1>
+        <p className="text-muted-foreground">Gerencie os acessos e links úteis internos da sua agência.</p>
       </div>
       
       <div className="border-b border-white/10">

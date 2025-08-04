@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -11,7 +12,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { db } from '@/lib/firebase';
-import { collection, addDoc, onSnapshot, doc, updateDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, addDoc, onSnapshot, doc, updateDoc, deleteDoc, serverTimestamp, writeBatch } from 'firebase/firestore';
 import type { Proposal, Client } from '@/lib/types';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -20,6 +21,7 @@ import { format, isPast } from 'date-fns';
 import { formatCurrency } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
+import { Checkbox } from '@/components/ui/checkbox';
 
 export default function ProposalsList() {
     const [proposals, setProposals] = useState<Proposal[]>([]);
@@ -29,6 +31,7 @@ export default function ProposalsList() {
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const [currentProposal, setCurrentProposal] = useState<Partial<Proposal> | null>(null);
     const { toast } = useToast();
+    const [selectedProposals, setSelectedProposals] = useState<string[]>([]);
 
     const proposalsCollectionRef = useMemo(() => collection(db, 'proposals'), []);
     const clientsCollectionRef = useMemo(() => collection(db, 'clients'), []);
@@ -117,6 +120,22 @@ export default function ProposalsList() {
             toast({ title: "Erro ao remover", description: "Não foi possível remover a proposta.", variant: "destructive" });
         }
     };
+
+    const handleBulkDelete = async () => {
+        if (selectedProposals.length === 0) return;
+        const batch = writeBatch(db);
+        selectedProposals.forEach(id => {
+            batch.delete(doc(proposalsCollectionRef, id));
+        });
+
+        try {
+            await batch.commit();
+            toast({ title: "Propostas Removidas!", description: `${selectedProposals.length} propostas foram removidas.` });
+            setSelectedProposals([]);
+        } catch (error) {
+            toast({ title: "Erro ao remover propostas", variant: "destructive" });
+        }
+    };
     
     const getStatusInfo = (proposal: Proposal): { status: string; className: string } => {
         const isExpired = proposal.validUntil && isPast(proposal.validUntil);
@@ -144,10 +163,27 @@ export default function ProposalsList() {
                         <CardTitle>Lista de Propostas</CardTitle>
                         <CardDescription>Crie e gerencie as propostas para seus clientes.</CardDescription>
                     </div>
-                     <Button onClick={() => handleOpenDialog(null)}>
-                        <PlusCircle className="mr-2 h-4 w-4" />
-                        Criar Proposta
-                    </Button>
+                    <div className="flex items-center gap-2">
+                         {selectedProposals.length > 0 && (
+                            <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                    <Button variant="destructive"><Trash2 className="mr-2 h-4 w-4"/> Excluir ({selectedProposals.length})</Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                    <AlertDialogHeader><AlertDialogTitle>Tem certeza?</AlertDialogTitle></AlertDialogHeader>
+                                    <AlertDialogDescription>Esta ação não pode ser desfeita e removerá as propostas selecionadas.</AlertDialogDescription>
+                                    <AlertDialogFooter>
+                                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                        <AlertDialogAction onClick={handleBulkDelete} className="bg-destructive hover:bg-destructive/90">Excluir</AlertDialogAction>
+                                    </AlertDialogFooter>
+                                </AlertDialogContent>
+                            </AlertDialog>
+                         )}
+                        <Button onClick={() => handleOpenDialog(null)}>
+                            <PlusCircle className="mr-2 h-4 w-4" />
+                            Criar Proposta
+                        </Button>
+                    </div>
                 </CardHeader>
                 <CardContent>
                     {isLoading ? (
@@ -158,6 +194,14 @@ export default function ProposalsList() {
                         <Table>
                             <TableHeader>
                                 <TableRow>
+                                    <TableHead className="w-[50px]">
+                                        <Checkbox
+                                            checked={selectedProposals.length === proposals.length && proposals.length > 0}
+                                            onCheckedChange={(checked) => {
+                                                setSelectedProposals(checked ? proposals.map(p => p.id) : [])
+                                            }}
+                                        />
+                                    </TableHead>
                                     <TableHead>Título</TableHead>
                                     <TableHead>Cliente</TableHead>
                                     <TableHead>Valor</TableHead>
@@ -169,7 +213,17 @@ export default function ProposalsList() {
                                 {proposals.length > 0 ? proposals.map((proposal) => {
                                     const { status, className } = getStatusInfo(proposal);
                                     return (
-                                    <TableRow key={proposal.id}>
+                                    <TableRow key={proposal.id} data-state={selectedProposals.includes(proposal.id) && "selected"}>
+                                        <TableCell>
+                                            <Checkbox
+                                                checked={selectedProposals.includes(proposal.id)}
+                                                onCheckedChange={(checked) => {
+                                                    setSelectedProposals(prev => 
+                                                        checked ? [...prev, proposal.id] : prev.filter(id => id !== proposal.id)
+                                                    )
+                                                }}
+                                            />
+                                        </TableCell>
                                         <TableCell className="font-medium">
                                             <div>{proposal.title}</div>
                                             {proposal.validityBenefit && (
@@ -213,7 +267,7 @@ export default function ProposalsList() {
                                     </TableRow>
                                 )}) : (
                                     <TableRow>
-                                        <TableCell colSpan={5} className="h-24 text-center">
+                                        <TableCell colSpan={6} className="h-24 text-center">
                                             Nenhuma proposta cadastrada.
                                         </TableCell>
                                     </TableRow>

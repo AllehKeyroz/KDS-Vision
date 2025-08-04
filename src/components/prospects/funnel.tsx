@@ -19,6 +19,7 @@ import { format } from 'date-fns';
 import { runProspectScraper } from '@/app/actions';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
+import { Checkbox } from '@/components/ui/checkbox';
 
 const STAGES: Prospect['stage'][] = ['Contato Inicial', 'Qualificado', 'Proposta Enviada', 'Follow-up', 'Negociação', 'Fechado', 'Perdido'];
 
@@ -44,6 +45,7 @@ export default function ProspectsFunnel() {
     const [isScrapeResultsDialogOpen, setIsScrapeResultsDialogOpen] = useState(false);
     
     const [defaultTemplate, setDefaultTemplate] = useState<string>('Olá {prospectName}, tudo bem?');
+    const [selectedProspects, setSelectedProspects] = useState<string[]>([]);
 
     const prospectsCollectionRef = useMemo(() => collection(db, 'prospects'), []);
 
@@ -190,6 +192,22 @@ export default function ProspectsFunnel() {
         window.open(url, '_blank');
     };
 
+    const handleBulkDelete = async () => {
+        if (selectedProspects.length === 0) return;
+        const batch = writeBatch(db);
+        selectedProspects.forEach(id => {
+            batch.delete(doc(prospectsCollectionRef, id));
+        });
+
+        try {
+            await batch.commit();
+            toast({ title: "Prospects Removidos!", description: `${selectedProspects.length} prospects foram removidos.` });
+            setSelectedProspects([]);
+        } catch (error) {
+            toast({ title: "Erro ao remover", variant: "destructive" });
+        }
+    }
+
     return (
         <div className="space-y-6">
             <Card>
@@ -235,8 +253,25 @@ export default function ProspectsFunnel() {
             </Card>
 
             <Card>
-                <CardHeader>
+                <CardHeader className="flex flex-row items-center justify-between">
                     <CardTitle>Lista de Prospects</CardTitle>
+                    {selectedProspects.length > 0 && (
+                        <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                                <Button variant="destructive">
+                                    <Trash2 className="mr-2 h-4 w-4"/> Excluir ({selectedProspects.length})
+                                </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                                <AlertDialogHeader><AlertDialogTitle>Tem certeza?</AlertDialogTitle></AlertDialogHeader>
+                                <AlertDialogDescription>Esta ação não pode ser desfeita e removerá os prospects selecionados.</AlertDialogDescription>
+                                <AlertDialogFooter>
+                                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                    <AlertDialogAction onClick={handleBulkDelete} className="bg-destructive hover:bg-destructive/90">Excluir</AlertDialogAction>
+                                </AlertDialogFooter>
+                            </AlertDialogContent>
+                        </AlertDialog>
+                    )}
                 </CardHeader>
                 <CardContent>
                 {isLoading ? (
@@ -245,6 +280,14 @@ export default function ProspectsFunnel() {
                     <Table>
                         <TableHeader>
                             <TableRow>
+                                <TableHead className="w-[50px]">
+                                    <Checkbox
+                                        checked={selectedProspects.length === prospects.length && prospects.length > 0}
+                                        onCheckedChange={(checked) => {
+                                            setSelectedProspects(checked ? prospects.map(p => p.id) : [])
+                                        }}
+                                    />
+                                </TableHead>
                                 <TableHead>Nome</TableHead>
                                 <TableHead>Contato</TableHead>
                                 <TableHead>Etapa</TableHead>
@@ -254,7 +297,17 @@ export default function ProspectsFunnel() {
                         </TableHeader>
                         <TableBody>
                             {prospects.length > 0 ? prospects.map((prospect) => (
-                                <TableRow key={prospect.id}>
+                                <TableRow key={prospect.id} data-state={selectedProspects.includes(prospect.id) && "selected"}>
+                                    <TableCell>
+                                        <Checkbox
+                                            checked={selectedProspects.includes(prospect.id)}
+                                            onCheckedChange={(checked) => {
+                                                setSelectedProspects(prev => 
+                                                    checked ? [...prev, prospect.id] : prev.filter(id => id !== prospect.id)
+                                                )
+                                            }}
+                                        />
+                                    </TableCell>
                                     <TableCell className="font-medium">{prospect.name}</TableCell>
                                     <TableCell>{prospect.contact}</TableCell>
                                     <TableCell>{prospect.stage}</TableCell>
@@ -287,7 +340,7 @@ export default function ProspectsFunnel() {
                                     </TableCell>
                                 </TableRow>
                             )) : (
-                                <TableRow><TableCell colSpan={5} className="h-24 text-center">Nenhum prospect encontrado.</TableCell></TableRow>
+                                <TableRow><TableCell colSpan={6} className="h-24 text-center">Nenhum prospect encontrado.</TableCell></TableRow>
                             )}
                         </TableBody>
                     </Table>

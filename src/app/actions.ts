@@ -26,14 +26,6 @@ import {
     type ProspectScraperInput,
     type ProspectScraperOutput,
 } from '@/ai/flows/prospect-scraper-flow';
-import {
-    createEvolutionInstance,
-    fetchEvolutionInstances,
-    getEvolutionInstanceQR,
-    fetchChats,
-    fetchMessages,
-} from '@/ai/flows/evolution-api-flow';
-import type { EvolutionInstance, Chat, Message } from '@/lib/types';
 
 
 export async function runClientBrainstorming(input: ClientBrainstormingInput): Promise<ClientBrainstormingOutput> {
@@ -54,25 +46,4 @@ export async function runAdsCreator(input: AdsIACreatorInput): Promise<AdsIACrea
 
 export async function runProspectScraper(input: ProspectScraperInput): Promise<ProspectScraperOutput> {
     return await prospectScraper(input);
-}
-
-// Evolution API Actions
-export async function runCreateEvolutionInstance(input: { instanceName: string }): Promise<any> {
-    return await createEvolutionInstance(input);
-}
-
-export async function runFetchEvolutionInstances(): Promise<EvolutionInstance[]> {
-    return await fetchEvolutionInstances();
-}
-
-export async function runGetEvolutionInstanceQR(instanceName: string): Promise<any> {
-    return await getEvolutionInstanceQR(instanceName);
-}
-
-export async function runFetchChats(instanceName: string): Promise<Chat[]> {
-    return await fetchChats(instanceName);
-}
-
-export async function runFetchMessages(input: { instanceName: string; jid: string }): Promise<Message[]> {
-    return await fetchMessages(input);
 }

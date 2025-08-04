@@ -5,7 +5,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Briefcase, Users, ArrowRight, FolderKanban, ListTodo, Filter, CalendarIcon as CalendarIconLucide, User as UserIcon, PlusCircle, CheckCircle2, Loader2, Check, ChevronsUpDown, Trash2, DollarSign, RefreshCcw, ShoppingCart, ArrowUpCircle, ArrowDownCircle, FolderOpen, UserRound } from 'lucide-react';
+import { Briefcase, Users, ArrowRight, FolderKanban, ListTodo, Filter, CalendarIcon as CalendarIconLucide, User as UserIcon, PlusCircle, CheckCircle2, Loader2, Check, ChevronsUpDown, Trash2, DollarSign, RefreshCcw, ShoppingCart, ArrowUpCircle, ArrowDownCircle, FolderOpen, UserRound, Clock, Calendar as CalendarIcon, FileText } from 'lucide-react';
 import { db } from '@/lib/firebase';
 import { collection, onSnapshot, query, where, Timestamp, addDoc, doc, updateDoc, deleteDoc, getDocs, writeBatch, collectionGroup } from 'firebase/firestore';
 import type { Client, Prospect, Project, Task, User, Appointment, FinancialTransaction, Contract, RecurringExpense } from '@/lib/types';
@@ -13,7 +13,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
-import { format, addMinutes, setHours, setMinutes, startOfDay, startOfMonth, subMonths, endOfMonth } from 'date-fns';
+import { format, addMinutes, setHours, setMinutes, startOfDay, subMonths, endOfMonth, isFuture, addDays, isPast } from 'date-fns';
 import { cn, formatCurrency } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger, DialogClose, DialogFooter } from '@/components/ui/dialog';
@@ -26,14 +26,28 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { Badge } from '@/components/ui/badge';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { useAuth } from '@/hooks/use-auth';
+
 
 type AppointmentFormData = Omit<Appointment, 'id' | 'date'> & {
   id?: string;
   date: Date | undefined;
 }
 
+type UnifiedEvent = {
+    date: Date;
+    type: 'appointment' | 'project' | 'task';
+    title: string;
+    details: string;
+    id: string;
+    link?: string;
+    isOverdue?: boolean;
+};
+
 export default function DashboardPage() {
   const { toast } = useToast();
+  const { user: loggedInUser } = useAuth();
+
   const [clients, setClients] = useState<Client[]>([]);
   const [prospects, setProspects] = useState<Prospect[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
@@ -52,16 +66,18 @@ export default function DashboardPage() {
     clientId: '',
     projectId: ''
   });
-  const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
+  
+  // States for the main calendar and its dialogs
+  const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
   const [isAppointmentDialogOpen, setIsAppointmentDialogOpen] = useState(false);
+  const [isDayEventsDialogOpen, setIsDayEventsDialogOpen] = useState(false);
+  const [eventsForSelectedDay, setEventsForSelectedDay] = useState<UnifiedEvent[]>([]);
+
   
   const emptyAppointment: AppointmentFormData = { title: '', notes: '', userIds: [], duration: 30, date: undefined, clientId: undefined };
   const [appointmentFormData, setAppointmentFormData] = useState<AppointmentFormData>(emptyAppointment);
 
   useEffect(() => {
-    // Set selectedDate only on the client side to prevent hydration mismatch
-    setSelectedDate(new Date());
-
     const unsubscribes: (() => void)[] = [];
     
     setIsLoading(true);
@@ -105,6 +121,62 @@ export default function DashboardPage() {
     
     return () => unsubscribes.forEach(unsub => unsub());
   }, []);
+  
+  useEffect(() => {
+    if (loggedInUser) {
+        setFilters(f => ({ ...f, responsibleId: loggedInUser.id }));
+    }
+  }, [loggedInUser]);
+
+  const allEvents = useMemo(() => {
+    const projectEvents: UnifiedEvent[] = projects
+        .filter(p => p.deadline)
+        .map(p => ({
+            date: p.deadline!.toDate(),
+            type: 'project',
+            title: p.name,
+            details: `Prazo final do projeto.`,
+            id: p.id,
+            link: `/clients/${p.clientId}/projects/${p.id}`,
+            isOverdue: p.status !== 'Concluído' && isPast(p.deadline!.toDate())
+        }));
+
+    const taskEvents: UnifiedEvent[] = allTasks
+        .filter(t => t.deadline)
+        .map(t => ({
+            date: t.deadline.toDate(),
+            type: 'task',
+            title: t.text,
+            details: `Prazo da tarefa no projeto ${t.projectName}.`,
+            id: t.id,
+            link: `/clients/${t.clientId}/projects/${t.projectId}`,
+            isOverdue: !t.completed && isPast(t.deadline.toDate())
+        }));
+
+    const appointmentEvents: UnifiedEvent[] = appointments
+        .map(a => ({
+            date: a.date,
+            type: 'appointment',
+            title: a.title,
+            details: `Reunião às ${format(a.date, 'HH:mm')}.`,
+            id: a.id,
+            isOverdue: false, // Appointments don't have an overdue state in this context
+        }));
+
+    return [...projectEvents, ...taskEvents, ...appointmentEvents];
+  }, [projects, allTasks, appointments]);
+
+  const handleDayClick = (day: Date | undefined) => {
+    if (!day) return;
+    setSelectedDate(day);
+    const dayStr = format(day, 'yyyy-MM-dd');
+    const events = allEvents.filter(e => format(e.date, 'yyyy-MM-dd') === dayStr);
+    
+    if (events.length > 0) {
+      setEventsForSelectedDay(events);
+      setIsDayEventsDialogOpen(true);
+    }
+  };
 
   const handleOpenAppointmentDialog = (appointment?: Appointment | null, timeSlot?: Date) => {
     if (appointment) {
@@ -166,7 +238,6 @@ export default function DashboardPage() {
       }
     }
 
-
     setIsSaving(true);
 
     const dataToSave = {
@@ -211,9 +282,30 @@ export default function DashboardPage() {
       }
   }
   
-  const appointmentDates = useMemo(() => {
-      return appointments.map(app => app.date);
-  }, [appointments]);
+  const upcomingEvents = useMemo(() => {
+    const today = startOfDay(new Date());
+    const sevenDaysFromNow = addDays(today, 7);
+
+    return allEvents
+        .filter(e => e.date >= today && e.date <= sevenDaysFromNow)
+        .sort((a, b) => a.date.getTime() - b.date.getTime());
+  }, [allEvents]);
+
+  const { scheduledDates, overdueDates } = useMemo(() => {
+      const dates = new Set<string>();
+      const overdue = new Set<string>();
+      allEvents.forEach(e => {
+        const dateStr = format(e.date, 'yyyy-MM-dd');
+        dates.add(dateStr);
+        if (e.isOverdue) {
+            overdue.add(dateStr);
+        }
+      });
+      return {
+        scheduledDates: Array.from(dates).map(d => new Date(d)),
+        overdueDates: Array.from(overdue).map(d => new Date(d)),
+      }
+  }, [allEvents]);
 
   const filteredTasks = useMemo(() => {
     let tasks = allTasks.filter(t => !t.completed);
@@ -260,6 +352,16 @@ export default function DashboardPage() {
   
   const activeContracts = useMemo(() => contracts.filter(c => c.status === 'active'), [contracts]);
   const activeRecurringExpenses = useMemo(() => recurringExpenses.filter(e => e.status === 'active'), [recurringExpenses]);
+
+  const EventIcon = ({ type, isOverdue }: { type: UnifiedEvent['type'], isOverdue?: boolean }) => {
+    const color = isOverdue ? 'text-red-400' : 'text-primary';
+    switch (type) {
+        case 'appointment': return <CalendarIcon className="h-4 w-4 text-purple-400" />;
+        case 'project': return <Briefcase className={cn("h-4 w-4", color)} />;
+        case 'task': return <FileText className={cn("h-4 w-4", color)} />;
+        default: return <Clock className="h-4 w-4" />;
+    }
+  };
 
 
   return (
@@ -433,20 +535,20 @@ export default function DashboardPage() {
                                   <div className="space-y-2"><h4 className="font-medium leading-none">Filtros de Tarefas</h4><p className="text-sm text-muted-foreground">Filtre as tarefas por responsável ou prazo.</p></div>
                                   <div className="grid gap-2">
                                        <div className="space-y-1"><Label htmlFor="responsible">Responsável</Label>
-                                            <Select onValueChange={(value) => setFilters(f => ({...f, responsibleId: value === 'all' ? '' : value}))} defaultValue={filters.responsibleId}>
+                                            <Select onValueChange={(value) => setFilters(f => ({...f, responsibleId: value === 'all' ? '' : value}))} value={filters.responsibleId}>
                                                 <SelectTrigger id="responsible" className="h-8"><SelectValue placeholder="Selecione" /></SelectTrigger>
                                                 <SelectContent><SelectItem value="all">Todos</SelectItem>{users.map(user => (<SelectItem key={user.id} value={user.id}>{user.name}</SelectItem>))}</SelectContent>
                                             </Select>
                                        </div>
                                        <div className="space-y-1"><Label htmlFor="client">Cliente</Label>
-                                            <Select onValueChange={(value) => setFilters(f => ({...f, clientId: value === 'all' ? '' : value, projectId: ''}))} defaultValue={filters.clientId}>
+                                            <Select onValueChange={(value) => setFilters(f => ({...f, clientId: value === 'all' ? '' : value, projectId: ''}))} value={filters.clientId}>
                                                 <SelectTrigger id="client" className="h-8"><SelectValue placeholder="Selecione" /></SelectTrigger>
                                                 <SelectContent><SelectItem value="all">Todos</SelectItem>{clients.map(client => (<SelectItem key={client.id} value={client.id}>{client.name}</SelectItem>))}</SelectContent>
                                             </Select>
                                        </div>
                                        {filters.clientId && projectsForSelectedClient.length > 0 && (
                                         <div className="space-y-1"><Label htmlFor="project">Projeto</Label>
-                                            <Select onValueChange={(value) => setFilters(f => ({...f, projectId: value === 'all' ? '' : value}))} defaultValue={filters.projectId}>
+                                            <Select onValueChange={(value) => setFilters(f => ({...f, projectId: value === 'all' ? '' : value}))} value={filters.projectId}>
                                                 <SelectTrigger id="project" className="h-8"><SelectValue placeholder="Selecione" /></SelectTrigger>
                                                 <SelectContent><SelectItem value="all">Todos</SelectItem>{projectsForSelectedClient.map(project => (<SelectItem key={project.id} value={project.id}>{project.name}</SelectItem>))}</SelectContent>
                                             </Select>
@@ -516,41 +618,77 @@ export default function DashboardPage() {
                 </div>
             </CardHeader>
             <CardContent>
-                {selectedDate === undefined ? <Skeleton className="h-[298px] w-full" /> : 
-                  <>
-                    <Calendar
-                        mode="single"
-                        selected={selectedDate}
-                        onSelect={(date) => setSelectedDate(date)}
-                        className="p-0 rounded-md border"
-                        locale={ptBR}
-                        modifiers={{ scheduled: appointmentDates }}
-                        modifiersClassNames={{
-                            scheduled: 'relative after:absolute after:bottom-1 after:left-1/2 after:-translate-x-1/2 after:w-1 after:h-1 after:rounded-full after:bg-primary',
-                        }}
-                    />
-                    <div className="mt-4 space-y-2">
-                         <h4 className="font-semibold">Compromissos para {selectedDate ? format(selectedDate, 'dd/MM/yyyy', { locale: ptBR }) : '...'}:</h4>
-                        {dailyAppointments.length > 0 ? (
-                            <ScrollArea className="h-40">
-                            {dailyAppointments.map(app => (
-                                <div key={app.id} onClick={() => handleOpenAppointmentDialog(app)} className="text-sm p-2 rounded-md bg-secondary/50 mb-1 cursor-pointer hover:bg-secondary">
-                                    <p className="font-bold">{app.title}</p>
-                                    <p className="text-xs text-muted-foreground">Horário: {format(app.date, 'HH:mm')}</p>
-                                    {app.userIds && <p className="text-xs text-muted-foreground">Responsáveis: {app.userIds.map(uid => users.find(u => u.id === uid)?.name || '').join(', ')}</p>}
-                                    {app.notes && <p className="text-xs mt-1">{app.notes}</p>}
+                <Calendar
+                    mode="single"
+                    selected={selectedDate}
+                    onSelect={handleDayClick}
+                    className="p-0 rounded-md border"
+                    locale={ptBR}
+                    modifiers={{ 
+                        scheduled: scheduledDates,
+                        overdue: overdueDates
+                    }}
+                    modifiersClassNames={{
+                        scheduled: 'relative after:absolute after:bottom-1 after:left-1/2 after:-translate-x-1/2 after:w-1 after:h-1 after:rounded-full after:bg-primary',
+                        overdue: 'relative after:absolute after:bottom-1 after:left-1/2 after:-translate-x-1/2 after:w-1 after:h-1 after:rounded-full after:bg-red-500',
+                    }}
+                />
+                <div className="mt-4 space-y-2">
+                     <h4 className="font-semibold">Próximos Compromissos (7 dias)</h4>
+                    {upcomingEvents.length > 0 ? (
+                        <ScrollArea className="h-40">
+                        {upcomingEvents.map(event => (
+                             <div key={event.id} className="text-sm p-2 rounded-md bg-secondary/50 mb-1">
+                                <div className="flex items-start gap-2">
+                                    <EventIcon type={event.type} isOverdue={event.isOverdue} />
+                                    <div>
+                                        <p className="font-bold">{event.title}</p>
+                                        <p className="text-xs text-muted-foreground">{format(event.date, 'dd/MM/yyyy HH:mm', { locale: ptBR })}</p>
+                                        <p className="text-xs mt-1">{event.details}</p>
+                                    </div>
+                                    {event.link && <Link href={event.link} className="ml-auto"><Button variant="ghost" size="icon" className="h-8 w-8"><ArrowRight className="h-4 w-4" /></Button></Link>}
                                 </div>
-                            ))}
-                            </ScrollArea>
-                        ) : (
-                            <p className="text-sm text-muted-foreground">Nenhum compromisso para esta data.</p>
-                        )}
-                    </div>
-                  </>
-                }
+                            </div>
+                        ))}
+                        </ScrollArea>
+                    ) : (
+                        <p className="text-sm text-muted-foreground">Nenhum compromisso para os próximos 7 dias.</p>
+                    )}
+                </div>
             </CardContent>
           </Card>
       </div>
+
+       <Dialog open={isDayEventsDialogOpen} onOpenChange={setIsDayEventsDialogOpen}>
+        <DialogContent>
+            <DialogHeader>
+                <DialogTitle>Eventos de {selectedDate ? format(selectedDate, 'PPP', { locale: ptBR }) : ''}</DialogTitle>
+                <DialogDescription>Todos os compromissos e prazos para este dia.</DialogDescription>
+            </DialogHeader>
+            <ScrollArea className="max-h-80">
+                <div className="space-y-2 pr-4">
+                    {eventsForSelectedDay.map(event => (
+                        <div key={`${event.type}-${event.id}`} className="text-sm p-3 rounded-md bg-secondary/50">
+                           <div className="flex items-start gap-3">
+                                <EventIcon type={event.type} isOverdue={event.isOverdue} />
+                                <div className="flex-1">
+                                    <p className="font-bold">{event.title}</p>
+                                    <p className="text-xs mt-1 text-muted-foreground">{event.details}</p>
+                                </div>
+                                {event.link && (
+                                    <Link href={event.link} passHref>
+                                        <Button variant="ghost" size="icon" className="h-8 w-8 ml-auto">
+                                            <ArrowRight className="h-4 w-4" />
+                                        </Button>
+                                    </Link>
+                                )}
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            </ScrollArea>
+        </DialogContent>
+       </Dialog>
 
        <Dialog open={isAppointmentDialogOpen} onOpenChange={(isOpen) => {
             setIsAppointmentDialogOpen(isOpen);
@@ -658,6 +796,3 @@ export default function DashboardPage() {
   );
 }
 
-    
-
-    

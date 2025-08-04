@@ -77,8 +77,8 @@ export default function AgencyAccessPage() {
 
     const handleAccessSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!accessFormData.platform || !accessFormData.login || !accessFormData.password_plain) {
-            toast({ title: "Campos obrigatórios", description: "Plataforma, login e senha são obrigatórios.", variant: "destructive" });
+        if (!accessFormData.platform || !accessFormData.login) {
+            toast({ title: "Campos obrigatórios", description: "Plataforma e login são obrigatórios.", variant: "destructive" });
             return;
         }
         setIsSavingAccess(true);
@@ -133,8 +133,8 @@ export default function AgencyAccessPage() {
                             </div>
                         </div>
                         <div className="space-y-1">
-                            <Label htmlFor="apiKey">Observações / Outras Infos</Label>
-                            <Input id="apiKey" placeholder="Ex: Informação importante sobre este acesso" value={accessFormData.apiKey} onChange={handleAccessChange}/>
+                            <Label htmlFor="apiKey">Chave de API (Opcional)</Label>
+                            <Input id="apiKey" placeholder="Ex: pk_live_xxxxxxxxxxxxxx" value={accessFormData.apiKey} onChange={handleAccessChange}/>
                         </div>
                         <div className="flex justify-end">
                             <Button type="submit" variant="secondary" className="font-bold tracking-wide" disabled={isSavingAccess}>
@@ -157,7 +157,7 @@ export default function AgencyAccessPage() {
                             <TableHead>Plataforma</TableHead>
                             <TableHead>Login</TableHead>
                             <TableHead>Senha</TableHead>
-                            <TableHead>Observações</TableHead>
+                            <TableHead>Chave API</TableHead>
                             <TableHead className="text-right">Ações</TableHead>
                         </TableRow>
                     </TableHeader>
@@ -182,7 +182,12 @@ export default function AgencyAccessPage() {
                                         Copiar Senha
                                     </Button>
                                 </TableCell>
-                                <TableCell className="text-muted-foreground">{access.apiKey}</TableCell>
+                                <TableCell>
+                                     <Button variant="ghost" size="sm" onClick={() => handleCopy(access.apiKey, 'Chave API')}>
+                                        <KeyRound className="mr-2 h-3 w-3" />
+                                        Copiar Chave
+                                    </Button>
+                                </TableCell>
                                 <TableCell className="text-right">
                                     <AlertDialog>
                                       <AlertDialogTrigger asChild>
