@@ -1,7 +1,7 @@
 
 'use client'
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
@@ -55,7 +55,7 @@ export default function AgencyAccessPage() {
         };
     }, [toast]);
 
-    const handleCopy = (text: string, fieldName: string) => {
+    const handleCopy = (text: string | undefined, fieldName: string) => {
         if (!text) {
              toast({
                 title: 'Campo vazio',

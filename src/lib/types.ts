@@ -65,13 +65,17 @@ export type Client = {
   context?: ClientContext;
 };
 
+export type AccessDetail = {
+  id: string;
+  type: string;
+  value: string;
+  isSecret?: boolean;
+}
+
 export type ClientAccess = {
   id: string;
   platform: string;
-  link: string;
-  login: string;
-  password_plain: string; 
-  apiKey: string;
+  details: AccessDetail[];
 };
 
 export interface BrainstormSession {
