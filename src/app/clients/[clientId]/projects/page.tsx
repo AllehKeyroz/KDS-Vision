@@ -1,3 +1,4 @@
+
 'use client'
 
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
@@ -85,33 +86,13 @@ export default function ProjectsPage() {
     const projectsCollectionRef = useMemo(() => collection(db, 'clients', clientId, 'projects'), [clientId]);
 
     useEffect(() => {
-        const unsubscribe = onSnapshot(projectsCollectionRef, async (snapshot) => {
-            const projectsData: Project[] = [];
-            for (const projectDoc of snapshot.docs) {
-                const project = { id: projectDoc.id, ...projectDoc.data() } as Project;
-                
-                // Fetch sections for each project
-                const sectionsCollectionRef = collection(db, 'clients', clientId, 'projects', project.id, 'sections');
-                const sectionsSnapshot = await getDocs(sectionsCollectionRef);
-                project.sections = [];
-                for (const sectionDoc of sectionsSnapshot.docs) {
-                    const section = { id: sectionDoc.id, ...sectionDoc.data() } as ProjectSection;
-                    
-                    // Fetch tasks for each section
-                    const tasksCollectionRef = collection(db, 'clients', clientId, 'projects', project.id, 'sections', section.id, 'tasks');
-                    const tasksSnapshot = await getDocs(tasksCollectionRef);
-                    section.tasks = tasksSnapshot.docs.map(taskDoc => ({ id: taskDoc.id, ...taskDoc.data() } as Task));
-                    
-                    project.sections.push(section);
-                }
-                projectsData.push(project);
-            }
-            console.log("Projetos recebidos do Firestore:", projectsData);
+        const unsubscribe = onSnapshot(projectsCollectionRef, (snapshot) => {
+            const projectsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Project));
             setProjects(projectsData);
             setIsLoading(false);
         });
         return () => unsubscribe();
-    }, [projectsCollectionRef, clientId]);
+    }, [projectsCollectionRef]);
 
     const handleOpenDialog = (project: Partial<Project> | null) => {
         setCurrentProject(project);

@@ -56,7 +56,9 @@ function AccountSwitcher() {
         return <Skeleton className="h-10 w-full" />;
     }
     
-    const assignedClients = clients.filter(c => user.role === 'agencyAdmin' || (user.assignedClientIds || []).includes(c.id));
+    const assignedClients = clients
+        .filter(c => user.role === 'agencyAdmin' || (user.assignedClientIds || []).includes(c.id))
+        .sort((a, b) => a.name.localeCompare(b.name));
     
     const getContextName = () => {
       if (viewContext.type === 'client') {
@@ -182,6 +184,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                                <SidebarMenuButton
                                isActive={isActiveClientRoot}
                                tooltip={item.name}
+                               // @ts-ignore
                                disabled={item.disabled}
                                >
                                <item.icon />
@@ -197,6 +200,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                         <SidebarMenuButton
                         isActive={isActive}
                         tooltip={item.name}
+                        // @ts-ignore
                         disabled={item.disabled}
                         >
                         <item.icon />
